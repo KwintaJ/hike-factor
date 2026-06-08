@@ -1,0 +1,43 @@
+# Dokumentacja
+
+## Decyzja operacyjna
+
+System hike-factor ma pomóc turystom i pasjonatom wędrówek górskich w sytuacji planowania wyjścia na tatrzańskie szlaki w warunkach zmiennej pogody i zagrożeń obiektywnych podjąć decyzję o wyborze bezpiecznej, optymalnej trasy lub ewentualnej rezygnacji z wycieczki, na podstawie bieżącej prognozy pogody, analizy warunków z poprzedniej doby (ocena śliskości/śniegu), komunikatów lawinowych TOPR oraz parametrów topograficznych szlaku (nachylenie, profil), w czasie wygodnym dla planowania przed wyruszeniem na szlak (odpowiedź systemu w ciągu kilku sekund).
+
+## Aktorzy i tryby pracy
+
+| Rola                  | Typowa decyzja                                                                                                                    | Widok główny              | Pytanie kontrolne UI                                                                                                                              |
+| :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Turysta Niezalogowany | Który szlak wybrać na bezpieczny spacer na podstawie ogólnych warunków meteorologicznych.                                         | `/ ` (Mapa główna)        | Czy ogólna ocena „hike-factor” oraz ostrzeżenia pogodowe są widoczne w panelu dolnym w 2 sekundy po kliknięciu szlaku bez przewijania strony?     |
+| Turysta Zalogowany    | Który ze swoich ulubionych szlaków ma dziś najlepsze warunki; czy warunki na obserwowanych trasach uległy nagłemu pogorszeniu.    | `/ ` oraz `/favorites`    | Czy system pozwala na szybkie przejście z listy ulubionych do lokalizacji szlaku na mapie i zapisanie nowej trasy jednym kliknięciem?             |
+
+## Mapa widoków
+
+| Route                             | Cel widoku                                                                                                                                    | Aktor                 | Kluczowe komponenty                                                           |
+| :-------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------- | :---------------------------------------------------------------------------- |
+| `/ `                              | Główny pulpit decyzyjny: Interaktywna mapa Tatr z nakładkami warstw oraz dolny panel szczegółów szlaku (profil, nachylenie, hike-factor).     | Każdy                 | `TatryMap`, `LayersConfigPanel`, `ConditionDetailsPanel`, `HikeFactorBadge`   |
+| `/favorites`                      | Zarządzanie trasami: Lista obserwowanych przez użytkownika szlaków z agregacją ich aktualnego statusu i alertów.                              | Turysta zalogowany    | `FavoritesList`, `QuickStatusCard`                                            |
+| `/auth/login` `/auth/register`    | Uwierzytelnianie: Logowanie i rejestracja użytkowników w celu ochrony endpointów zapisu.                                                      | Turysta niezalogowany | `LoginForm`, `RegisterForm`                                                   |
+
+# Architecture Decision Record
+
+## PostgreSQL
+
+**PostgreSQL z rozszerzeniem przestrzennym PostGIS:** główna relacyjna baza danych systemu.  
+Głównym elementem aplikacji jest interaktywna mapa z klikalnymi szlakami. Szlaki turystyczne nie są zwykłymi rekordami tekstowymi, lecz obiektami geograficznymi typu `LINESTRING` (ciągi punktów o współrzędnych GPS). Aby wyliczyć największe nachylenie terenu czy profil wysokościowy trasy, system musi wykonywać operacje na geometrii linii oraz wiązać te szlaki relacją wiele-do-wielu z tabelą użytkowników (ulubione szlaki).  
+*Alternatywy:* MongoDB (posiada natywne wsparcie dla formatów GeoJSON) oraz czysty PostgreSQL (przechowywanie punktów jako zwykły ciąg JSONb).  
+*Uzasadnienie:* MongoDB obsługuje indeksy przestrzenne, ale radzi sobie gorzej z zaawansowanymi relacjami wymaganymi przez system (Użytkownicy <-> Ulubione <-> Szlaki). Czysty PostgreSQL bez PostGIS uniemożliwiłby wykonywanie natywnych, niesamowicie szybkich operacji przestrzennych bezpośrednio w bazie SQL (takich jak ST_Length do wyliczenia dystansu, czy agregacja punktów wysokościowych DEM). PostGIS pozwala nam na optymalne przeszukiwanie i renderowanie wektorowe tras przy użyciu indeksów GIST.  
+*Trade-offs:* Zastosowanie PostGIS wymusza użycie dedykowanego, cięższego obrazu Dockera (postgis/postgis) zamiast standardowego, alpine oraz nakłada konieczność opanowania składni zapytań przestrzennych SQL.  
+
+## Golang
+
+**Go jako backend**. 
+Aplikacja działa jako agregator danych z zewnętrznych serwisów (pogoda historyczna, prognoza, komunikaty lawinowe). Proces ten wymaga pobierania informacji z kilku niezależnych źródeł HTTP, transformacji danych oraz wyliczania autorskiego wskaźnika "hike-factor". Serwer musi obsługiwać te żądania asynchronicznie, nie blokując wątku głównego, aby zapewnić czas odpowiedzi poniżej 2 sekund.  
+*Alternatywy:* Node.js (TypeScript) oraz Java (Spring Boot).  
+*Uzasadnienie:* Node.js, mimo że asynchroniczny, działa na jednym wątku, co przy intensywnych obliczeniach matematycznych (wyliczanie nachyleń szlaku z gęstej siatki punktów) mogłoby go dławić. Java (Spring) gwarantuje wydajność, ale narzuca potężny overhead pamięciowy i wolny czas uruchamiania (Cold Start) w kontenerach Docker. Go oferuje wydajność języków natywnych, mikroskopijne zużycie RAM-u oraz model współbieżności oparty na goroutines i channels, co pozwala na równoległe odpytywanie zewnętrznych API w sposób czysty i wydajny.  
+*Trade-offs:* Go posiada dość ascetyczny system typów i nie oferuje tak bogatych ekosystemów ORM jak Hibernate w Javie czy Prisma w Node.js. Mapowanie struktur przestrzennych PostGIS na struktury Go wymaga napisania jawnego kodu SQL, co jednak daje pełną kontrolę nad wydajnością zapytań.  
+
+# Kontrakt API
+
+Wszystkie odpowiedzi w przypadku błędu zwracają schematyczny JSON:  
+`{"error": "Komunikat błędu", "code": 4xx/5xx}`
