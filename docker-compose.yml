@@ -1,0 +1,32 @@
+services:
+  # backend
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    platform: linux/amd64
+    container_name: hike_factor_db
+    environment:
+      POSTGRES_USER: hike_master
+      POSTGRES_PASSWORD: supersecretpassword
+      POSTGRES_DB: hike_factor
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - hike_network
+
+  # cache
+  redis:
+    image: redis:7-alpine
+    container_name: hike_factor_cache
+    ports:
+      - "6379:6379"
+    networks:
+      - hike_network
+
+networks:
+  hike_network:
+    driver: bridge
+
+volumes:
+  pgdata:
