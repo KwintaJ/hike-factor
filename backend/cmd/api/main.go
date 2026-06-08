@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
 	"hike-factor/internal/handler"
 	"hike-factor/internal/model"
+	"hike-factor/internal/repository"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -14,6 +16,10 @@ import (
 
 func main() {
 	e := echo.New()
+
+	dbPool := repository.InitDB()
+	defer dbPool.Close()
+	repository.SeedData(dbPool)
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
@@ -24,85 +30,60 @@ func main() {
 
 	e.Validator = &handler.CustomValidator{Validator: validator.New()}
 
-	e.HTTPErrorHandler = func(err error, c echo.Context) {
-		code := http.StatusInternalServerError
-		message := "Wystąpił wewnętrzny błąd serwera"
-
-		if he, ok := err.(*echo.HTTPError); ok {
-			code = he.Code
-			if m, ok := he.Message.(string); ok {
-				message = m
-			}
-		}
-
-		_ = c.JSON(code, map[string]interface{}{
-			"error": message,
-			"code":  code,
-		})
-	}
-
-	// MOCK
-	
 	// GET /api/trails
 	e.GET("/api/trails", func(c echo.Context) error {
-		mockTrails := []model.Trail{
-			{
-				ID:         1,
-				Name:       "Szlakiem na Giewont",
-				Color:      "blue",
-				Difficulty: "hard",
-				Geometry: model.Geometry{
-					Type: "LineString",
-					Coordinates: [][]float64{
-						{19.93, 49.25},
-						{19.93, 49.23},
-					},
-				},
-			},
+		query := `
+			SELECT json_build_object(
+				'type', 'FeatureCollection',
+				'features', json_agg(
+					json_build_object(
+						'type', 'Feature',
+						'id', id,
+						'geometry', ST_AsGeoJSON(geom)::json,
+						'properties', json_build_object(
+							'id', id,
+							'name', name,
+							'color', color,
+							'difficulty', difficulty
+						)
+					)
+				)
+			) FROM trails;
+		`
+
+		var geojsonRaw string
+		err := dbPool.QueryRow(context.Background(), query).Scan(&geojsonRaw)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "Błąd odczytu danych przestrzennych")
 		}
-		return c.JSON(http.StatusOK, mockTrails)
+
+		return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, []byte(geojsonRaw))
 	})
 
 	// GET /api/trails/:id/conditions
 	e.GET("/api/trails/:id/conditions", func(c echo.Context) error {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
-		if err != nil || id != 1 {
-			return echo.NewHTTPError(http.StatusNotFound, "Nie znaleziono szlaku o podanym ID")
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "Niepoprawny format ID")
 		}
 
 		mockConditions := model.TrailConditions{
 			TrailID: id,
 			HikeFactor: model.HikeFactor{
-				Score:       68,
-				Label:       "Moderate",
-				Description: "Szlak miejscami śliski z powodu opadów z poprzedniej doby. Zalecane raczki.",
+				Score:       45 + (id % 50),
+				Label:       "Zmienne warunki",
+				Description: "Dane pogodowe wyznaczone dynamicznie",
 			},
 			WeatherForecast: model.WeatherForecast{
 				TempCelsius:  12.5,
-				WindSpeedKmh: 25,
-				Conditions:   "Rainy",
+				WindSpeedKmh: 15,
+				Conditions:   "Zachmurzenie umiarkowane",
 			},
-			AvalancheDangerLevel: 2,
+			AvalancheDangerLevel: 1,
 		}
 		return c.JSON(http.StatusOK, mockConditions)
 	})
 
-	// POST /api/favorites
-	e.POST("/api/favorites", func(c echo.Context) error {
-		req := new(model.FavoriteRequest)
-		
-		if err := c.Bind(req); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "Niepoprawny format danych")
-		}
-		
-		if err := c.Validate(req); err != nil {
-			return err
-		}
-
-		return c.JSON(http.StatusCreated, map[string]string{"status": "success"})
-	})
-
-	// start server
 	e.Logger.Fatal(e.Start(":8080"))
 }
