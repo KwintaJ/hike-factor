@@ -37,6 +37,20 @@ Aplikacja działa jako agregator danych z zewnętrznych serwisów (pogoda histor
 *Uzasadnienie:* Node.js, mimo że asynchroniczny, działa na jednym wątku, co przy intensywnych obliczeniach matematycznych (wyliczanie nachyleń szlaku z gęstej siatki punktów) mogłoby go dławić. Java (Spring) gwarantuje wydajność, ale narzuca potężny overhead pamięciowy i wolny czas uruchamiania (Cold Start) w kontenerach Docker. Go oferuje wydajność języków natywnych, mikroskopijne zużycie RAM-u oraz model współbieżności oparty na goroutines i channels, co pozwala na równoległe odpytywanie zewnętrznych API w sposób czysty i wydajny.  
 *Trade-offs:* Go posiada dość ascetyczny system typów i nie oferuje tak bogatych ekosystemów ORM jak Hibernate w Javie czy Prisma w Node.js. Mapowanie struktur przestrzennych PostGIS na struktury Go wymaga napisania jawnego kodu SQL, co jednak daje pełną kontrolę nad wydajnością zapytań.  
 
+## React + Vite + Tailwind
+
+**React (konfigurowany przez Vite)** oraz Tailwind CSS.  
+Aplikacja wymaga stworzenia interaktywnego panelu mapy połączonego z dynamicznie wysuwanym panelem dolnym. Zmiana wybranego szlaku na mapie musi natychmiastowo aktualizować dane pogodowe i wskaźnik komfortu bez przeładowania strony. Interfejs ma być minimalistyczny i ładny.  
+*Alternatywy:* Next.js (App Router) oraz czysty CSS / Styled Components.  
+*Uzasadnienie:* Next.js wprowadza architekturę Server Components, która jest świetna dla SEO, ale w przypadku wysoce interaktywnej, jednowstronicowej aplikacji z mapą (SPA) dodaje zbędny narzut i komplikuje integrację z bibliotekami mapowymi działającymi stricte po stronie klienta. Czysty React z Vite gwarantuje natychmiastowe budowanie aplikacji (HMR) i minimalny rozmiar paczki. Tailwind CSS pozwala na bezwysiłkowe wstrzyknięcie palety retro w konfiguracji i eliminuje problem pisania osobnych plików CSS, co zmniejsza dług technologiczny.  
+*Trade-offs:* Tailwind CSS przy braku dyscypliny może prowadzić do długich, mało czytelnych ciągów klas w plikach TSX, co będziemy mitygować poprzez wydzielanie małych, reużywalnych komponentów prezentacyjnych.  
+
+## TanStack Query + Zustand
+
+**TanStack Query** (React Query) do zarządzania danymi asynchronicznymi z API oraz **Zustand** do lekkiego, synchronicznego stanu mapy i interfejsu.  
+Typowym błędem w aplikacjach z mapami jest trzymanie współrzędnych geograficznych oraz danych z API w jednym globalnym stanie. Powoduje to, że ruch mapy lub kliknięcie elementu wymusza ponowne renderowanie punktów geometrycznych, drastycznie obniżając płynność.  
+*Uzasadnienie:* Zgodnie z mapą stanu, dane o warunkach szlaków to Server-state. TanStack Query automatycznie zajmie się ich cache'owaniem, obsługą stanu isLoading i ponownym odpytywaniem backendu tylko wtedy, gdy minie czas TTL. Stan Client-state (aktualnie kliknięty szlak activeTrailId) trafi do mikro-store'a Zustand. Zapobiega to niepotrzebnym renderom i rozdziela odpowiedzialności zgodnie z zasadami czystej architektury.  
+
 # Kontrakt API
 
 Wszystkie odpowiedzi w przypadku błędu zwracają schematyczny JSON:  
