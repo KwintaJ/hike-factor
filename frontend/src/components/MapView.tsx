@@ -1,56 +1,100 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import maplibregl from 'maplibre-gl';
 import { useMapStore } from '../store/useMapStore';
-import { MapPin } from 'lucide-react';
+
+const MAPTILER_KEY = 'Gu0T2JgGU5nLV4tlm7UY'; 
 
 export const MapView: React.FC = () => {
-  const { selectedTrailId, setSelectedTrailId } = useMapStore();
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const setSelectedTrailId = useMapStore((state) => state.setSelectedTrailId);
+
+  useEffect(() => {
+    if (!mapContainer.current || mapRef.current) return;
+
+    // Ładujemy kompletny, czysty styl wektorowy Topo bezpośrednio z serwerów MapTiler
+    const map = new maplibregl.Map({
+      container: mapContainer.current,
+      style: `https://api.maptiler.com/maps/topo-v2/style.json?key=${MAPTILER_KEY}`,
+      center: [20.0150, 49.2550], // Centrowanie na Tatry Wysokie i Zachodnie
+      zoom: 12.5,
+    });
+
+    mapRef.current = map;
+
+    map.on('load', () => {
+      // Wstrzykujemy Twoje dane przestrzenne z PostGIS jako nowe źródło na mapie wektorowej
+      map.addSource('tatry-trails', {
+        type: 'geojson',
+        data: 'http://localhost:8080/api/trails',
+      });
+
+      // Warstwa bazowa szlaków
+      map.addLayer({
+        id: 'trails-layer',
+        type: 'line',
+        source: 'tatry-trails',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': ['coalesce', ['get', 'color'], '#7C3AED'],
+          'line-width': 4,
+        },
+      });
+
+      // Warstwa podświetlenia (glow) po kliknięciu
+      map.addLayer({
+        id: 'trails-highlight',
+        type: 'line',
+        source: 'tatry-trails',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': ['coalesce', ['get', 'color'], '#7C3AED'],
+          'line-width': 8,
+          'line-opacity': 0.4,
+        },
+        filter: ['==', ['get', 'id'], ''],
+      });
+
+      // Zmiana zachowania kursora
+      map.on('mouseenter', 'trails-layer', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'trails-layer', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      // Kliknięcie w szlak (zwraca pełną relację jako jeden obiekt)
+      map.on('click', 'trails-layer', (e) => {
+        if (e.features && e.features.length > 0) {
+          const feature = e.features[0];
+          const id = feature.properties?.id;
+          
+          if (id) {
+            setSelectedTrailId(Number(id));
+            map.setFilter('trails-highlight', ['==', ['get', 'id'], Number(id)]);
+          }
+        }
+      });
+    });
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [setSelectedTrailId]);
 
   return (
-    <div className="relative w-full h-[60vh] bg-retro-blue/20 rounded-2xl border-2 border-retro-green/30 overflow-hidden flex flex-col items-center justify-center p-4">
-      {/* Siatka topograficzna w tle (retro sznyt) */}
-      <div className="absolute inset-0 opacity-5 bg-[linear-gradient(to_right,#1B3B2B_1px,transparent_1px),linear-gradient(to_bottom,#1B3B2B_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
-      
-      <div className="text-center z-10">
-        <h2 className="text-retro-green font-bold text-lg mb-2">Interaktywna Mapa Tatr (Mock)</h2>
-        <p className="text-sm text-retro-green/80 mb-6 max-w-md">
-          Kliknij na jeden z poniższych szlaków testowych, aby zaktualizować stan aplikacji i sprawdzić wskaźnik Hike-Factor.
-        </p>
+    <div className="relative w-full h-[65vh] rounded-2xl border-2 border-retro-green overflow-hidden shadow-lg">
+      <div ref={mapContainer} className="w-full h-full" />
+      <div className="absolute top-4 left-4 bg-retro-beige/90 backdrop-blur-md border border-retro-green/40 px-3 py-2 rounded-xl text-xs font-bold text-retro-green z-10 shadow-md">
+        🏔️ Podkład: MapTiler Topo Vector • Warstwa: PostGIS Relations
       </div>
-
-      <div className="flex gap-4 z-10">
-        <button
-          onClick={() => setSelectedTrailId(1)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium border-2 transition-all ${
-            selectedTrailId === 1
-              ? 'bg-retro-green text-retro-beige border-retro-green shadow-md'
-              : 'bg-retro-beige text-retro-green border-retro-green/40 hover:border-retro-green'
-          }`}
-        >
-          <MapPin size={18} className={selectedTrailId === 1 ? 'text-retro-rust' : 'text-retro-blue'} />
-          Szlakiem na Giewont (ID: 1)
-        </button>
-
-        <button
-          onClick={() => setSelectedTrailId(999)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium border-2 transition-all ${
-            selectedTrailId === 999
-              ? 'bg-retro-green text-retro-beige border-retro-green shadow-md'
-              : 'bg-retro-beige text-retro-green border-retro-green/40 hover:border-retro-green'
-          }`}
-        >
-          <MapPin size={18} className="text-gray-400" />
-          Nieistniejący Szlak (ID: 999)
-        </button>
-      </div>
-
-      {selectedTrailId && (
-        <button 
-          onClick={() => setSelectedTrailId(null)}
-          className="absolute top-4 right-4 text-xs text-retro-rust underline font-medium hover:text-retro-dark"
-        >
-          Resetuj zaznaczenie
-        </button>
-      )}
     </div>
   );
 };
