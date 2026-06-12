@@ -6,6 +6,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/labstack/echo/v4 v4.15.2
+	github.com/lib/pq v1.12.3
 )
 
 require (

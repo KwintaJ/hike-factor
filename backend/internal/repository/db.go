@@ -2,15 +2,11 @@ package repository
 
 import (
     "context"
-    "encoding/json"
-    "fmt"
     "io"
     "log"
-    "net/http"
-    "net/url"
     "strings"
-    "time"
     "os"
+    "encoding/csv"
 
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -92,101 +88,29 @@ func SeedData(pool *pgxpool.Pool) {
             name VARCHAR(255) NOT NULL,
             color VARCHAR(50) NOT NULL,
             difficulty VARCHAR(50) NOT NULL,
+            min_elevation INTEGER DEFAULT 0,
+            max_elevation INTEGER DEFAULT 0,
+            distance DOUBLE PRECISION DEFAULT 0.0,
             geom GEOMETRY(MultiLineString, 4326) NOT NULL
         );
     `)
-    _, _ = pool.Exec(ctx, "TRUNCATE TABLE trails RESTART IDENTITY;")
 
-    overpassURL := "https://overpass.openstreetmap.fr/api/interpreter"    
-    rawQuery := `[out:json][timeout:120];
-    relation["route"="hiking"](49.18,19.75,49.30,20.15);
-    out geom(49.18,19.75,49.30,20.15);`
+    file, err := os.Open("data/trails.csv")
+    if err != nil { log.Printf("Nie znaleziono pliku CSV: %v", err); return }
+    defer file.Close()
 
-    data := url.Values{}
-    data.Set("data", rawQuery)
+    reader := csv.NewReader(file)
+    reader.Read()
 
-    req, err := http.NewRequest("POST", overpassURL, strings.NewReader(data.Encode()))
-    if err != nil {
-        log.Fatalf("Błąd żądania: %v", err)
+    for {
+        row, err := reader.Read()
+        if err == io.EOF { break }
+       
+        _, err = pool.Exec(ctx, `
+            INSERT INTO trails (name, color, difficulty, min_elevation, max_elevation, distance, geom) 
+            VALUES ($1, $2, $3, $4, $5, $6, ST_GeomFromText($7, 4326))
+            ON CONFLICT (id) DO NOTHING;`,
+            row[0], row[1], row[2], row[3], row[4], row[5], row[6])
+        if err != nil { log.Printf("Błąd wstawiania szlaku %s: %v", row[0], err) }
     }
-    req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-    req.Header.Set("User-Agent", "HikeFactorAcademic/3.0")
-
-    client := &http.Client{Timeout: 120 * time.Second}
-    resp, err := client.Do(req)
-    if err != nil {
-        log.Fatalf("Brak odpowiedzi z API (prawdopodobnie padł serwer OSM): %v", err)
-    }
-    defer resp.Body.Close()
-
-    body, err := io.ReadAll(resp.Body)
-    if resp.StatusCode != http.StatusOK {
-        log.Fatalf("Błąd Overpass API: %s", string(body))
-    }
-
-    var osmData OverpassResponse
-    if err := json.Unmarshal(body, &osmData); err != nil {
-        log.Fatalf("Błąd parsowania JSON: %v", err)
-    }
-
-    insertQuery := `
-        INSERT INTO trails (name, color, difficulty, geom) 
-        VALUES ($1, $2, $3, ST_GeomFromText($4, 4326));
-    `
-
-    savedCount := 0
-    for _, el := range osmData.Elements {
-        name := el.Tags["name"]
-        
-        if name == "" {
-            if ref, ok := el.Tags["ref"]; ok {
-                name = "Szlak " + ref
-            } else if col, ok := el.Tags["color"]; ok {
-                name = "Szlak " + col
-            } else {
-                name = "Szlak turystyczny TPN"
-            }
-        }
-
-        var segments []string
-        for _, member := range el.Members {
-            if member.Type == "way" {
-                var pts []string
-                for _, pt := range member.Geometry {
-                    // ROZWIĄZANIE: Ignorujemy punkty "wycięte" przez Overpass (będące zerami w Go)
-                    if pt.Lat == 0.0 && pt.Lon == 0.0 {
-                        continue
-                    }
-                    pts = append(pts, fmt.Sprintf("%f %f", pt.Lon, pt.Lat))
-                }
-                
-                // Dodajemy segment tylko wtedy, gdy po odcięciu zer wciąż mamy linię (min. 2 punkty)
-                if len(pts) >= 2 {
-                    segments = append(segments, "("+strings.Join(pts, ", ")+")")
-                }
-            }
-        }
-
-        // Jeśli cały szlak znalazł się poza bboxem i został wycięty do zera, pomijamy go
-        if len(segments) == 0 {
-            continue
-        }
-
-        wktMultiLine := "MULTILINESTRING(" + strings.Join(segments, ", ") + ")"
-        color := resolveTrailColor(el.Tags)
-        
-        difficulty := "standard"
-        if sac, ok := el.Tags["sac_scale"]; ok {
-            difficulty = sac
-        }
-
-        _, err := pool.Exec(ctx, insertQuery, name, color, difficulty, wktMultiLine)
-        if err != nil {
-            log.Printf("Błąd zapisu szlaku %s: %v", name, err)
-            continue
-        }
-        savedCount++
-    }
-
-    fmt.Printf("Baza PostGIS została zasilona szlakami (%d)\n", savedCount)
 }
