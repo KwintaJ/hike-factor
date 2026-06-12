@@ -92,9 +92,6 @@ export const MapView: React.FC = () => {
   return (
     <div className="relative w-full h-[65vh] rounded-2xl border-2 border-retro-green overflow-hidden shadow-lg">
       <div ref={mapContainer} className="w-full h-full" />
-      <div className="absolute top-4 left-4 bg-retro-beige/90 backdrop-blur-md border border-retro-green/40 px-3 py-2 rounded-xl text-xs font-bold text-retro-green z-10 shadow-md">
-        🏔️ Podkład: MapTiler Topo Vector • Warstwa: PostGIS Relations
-      </div>
     </div>
   );
 };

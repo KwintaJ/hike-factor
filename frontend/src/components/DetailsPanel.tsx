@@ -1,125 +1,120 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useMapStore } from '../store/useMapStore';
-import { CloudRain, Thermometer, Wind, ShieldAlert, Compass } from 'lucide-react';
+import { useMapStore } from '../store/useMapStore'; // Import Twojego store
 
-interface ConditionData {
-  trail_id: number;
-  hike_factor: { score: number; label: string; description: string };
-  weather_forecast: { temp_celsius: number; wind_speed_kmh: number; conditions: string };
-  avalanche_danger_level: number;
+interface TrailConditions {
+  hikeFactor: number;
+  weather: { condition: string; temp: number; wind: number; };
+  precipitation24h: number;
+  surface: { status: string; snowDepth: number; };
+  avalancheLevel: number;
+  elevation: { min: number; max: number; };
 }
 
 export const DetailsPanel: React.FC = () => {
+  // Pobieramy ID z Twojego store'a (ustawianego przez kliknięcie na mapie)
   const selectedTrailId = useMapStore((state) => state.selectedTrailId);
 
-  // TanStack Query pobiera dane automatycznie tylko, gdy selectedTrailId nie jest nullem (Server-state)
-  const { data, isLoading, error } = useQuery<ConditionData, { error: string; code: number }>({
-    queryKey: ['conditions', selectedTrailId],
+  const { data, isLoading, error } = useQuery<TrailConditions>({
+    queryKey: ['trailConditions', selectedTrailId],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:8080/api/trails/${selectedTrailId}/conditions`);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw errorData; // Przekazujemy spójną strukturę błędu z Go (R6)
-      }
-      return res.json();
+      // Backend w Go teraz obsługuje parametry typu ?id=123
+      const response = await fetch(`http://localhost:8080/api/trails/conditions?id=${selectedTrailId}`);
+      if (!response.ok) throw new Error('Błąd pobierania danych');
+      return response.json();
     },
-    enabled: !!selectedTrailId, // Zapobiega odpytywaniu API, gdy nie wybrano szlaku
-    staleTime: 1000 * 60 * 5,    // Dane są uznawane za świeże przez 5 minut
+    // Zapytanie odpala się tylko gdy ID jest ustawione
+    enabled: selectedTrailId !== null,
   });
 
-  if (!selectedTrailId) {
+  // 1. Ekran startowy (brak wybranego ID)
+  if (selectedTrailId === null) {
     return (
-      <div className="w-full bg-retro-beige border-2 border-dashed border-retro-green/20 rounded-2xl p-8 text-center text-retro-green/60 font-medium">
-        Wybierz szlak turystyczny na mapie powyżej, aby przeanalizować warunki atmosferyczne i współczynnik bezpieczeństwa.
+      <div className="w-full min-h-[105px] border-2 border-dashed border-retro-green/30 rounded-xl flex items-center justify-center text-retro-blue font-bold text-sm p-4 text-center">
+        📍 Wybierz szlak na mapie, aby załadować warunki
       </div>
     );
   }
 
+  // 2. Ekran ładowania
   if (isLoading) {
     return (
-      <div className="w-full bg-retro-beige border-2 border-retro-green/20 rounded-2xl p-8 text-center animate-pulse text-retro-green font-medium">
-        Agregacja danych z API pogodowych i komunikatów TOPR...
+      <div className="w-full min-h-[105px] border-2 border-retro-green/20 rounded-xl flex items-center justify-center text-retro-green font-bold text-sm animate-pulse p-4 text-center">
+        ⏳ Backend Go oblicza dane dla szlaku {selectedTrailId}...
       </div>
     );
   }
 
-  if (error) {
+  // 3. Ekran błędu
+  if (error || !data) {
     return (
-      <div className="w-full bg-retro-beige border-2 border-retro-rust/40 rounded-2xl p-6 text-retro-rust bg-retro-rust/5">
-        <h4 className="font-bold text-lg mb-1 flex items-center gap-2">
-          <ShieldAlert size={20} /> Błąd pobierania danych (Kod {error.code || 500})
-        </h4>
-        <p className="text-sm font-medium">{error.error || 'Nie udało się połączyć z serwerem API.'}</p>
+      <div className="w-full min-h-[105px] bg-retro-rust/10 border-2 border-retro-rust/40 rounded-xl flex items-center justify-center text-retro-rust font-bold text-sm p-4 text-center">
+        ⚠️ Błąd połączenia z serwerem. Upewnij się, że backend obsługuje parametr ID.
       </div>
     );
   }
 
+  // 4. TWÓJ ZATWIERDZONY SZABLON (dane z {data})
   return (
-    <div className="w-full bg-retro-beige border-2 border-retro-green rounded-2xl p-6 shadow-sm flex flex-col md:flex-row gap-6 transition-all duration-300">
-      
-      {/* GŁÓWNY WSKAŹNIK - HIKE FACTOR */}
-      <div className="flex-1 bg-retro-green text-retro-beige p-5 rounded-xl flex flex-col justify-between border border-retro-green">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+      {/* KAFELEK 1: HIKE FACTOR */}
+      <div className="bg-retro-dark text-retro-beige p-4 rounded-xl flex items-center justify-between border-2 border-retro-dark min-h-[105px]">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-retro-blue">Wskaźnik Bezpieczeństwa</span>
-          <h3 className="text-2xl font-bold mt-1 mb-2 text-retro-beige">Hike Factor</h3>
-          <p className="text-sm text-retro-beige/80 leading-relaxed">{data?.hike_factor.description}</p>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-retro-yellow">Hike Factor</h3>
+          <p className="text-sm font-medium opacity-90 mt-1">Ogólna ocena komfortu</p>
         </div>
-        <div className="flex items-baseline gap-3 mt-4">
-          <span className="text-5xl font-black text-retro-rust">{data?.hike_factor.score}</span>
-          <span className="text-lg font-bold text-retro-blue">/ 100 ({data?.hike_factor.label})</span>
+        <div className="w-12 h-12 rounded-xl bg-retro-rust text-white flex items-center justify-center text-xl font-black shadow-md">
+          {data.hikeFactor}
         </div>
       </div>
 
-      {/* PROGNOZA POGODY */}
-      <div className="flex-1 border border-retro-green/20 p-5 rounded-xl flex flex-col justify-between">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-retro-green/60">Bieżące warunki (24h)</span>
-          <h3 className="text-xl font-bold text-retro-green mt-1 mb-4 flex items-center gap-2">
-            <CloudRain size={20} className="text-retro-blue" /> Prognoza Meteo
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center gap-2">
-              <Thermometer size={18} className="text-retro-rust" />
-              <div>
-                <p className="text-xs text-retro-green/60 font-medium">Temperatura</p>
-                <p className="font-bold text-retro-dark">{data?.weather_forecast.temp_celsius} °C</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Wind size={18} className="text-retro-blue" />
-              <div>
-                <p className="text-xs text-retro-green/60 font-medium">Wiatr</p>
-                <p className="font-bold text-retro-dark">{data?.weather_forecast.wind_speed_kmh} km/h</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 pt-3 border-t border-retro-green/10 text-xs font-bold text-retro-green/80">
-          Status: {data?.weather_forecast.conditions}
+      {/* KAFELEK 2: POGODA */}
+      <div className="bg-retro-yellow/10 border-2 border-retro-yellow/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-yellow uppercase tracking-wider">Pogoda</span>
+        <div className="mt-2 flex justify-between items-baseline">
+          <span className="text-base font-black text-retro-dark">{data.weather.condition}</span>
+          <span className="text-sm font-bold text-retro-rust">{data.weather.temp}°C | {data.weather.wind} km/h</span>
         </div>
       </div>
 
-      {/* TOPR / LAWINY */}
-      <div className="w-full md:w-64 border border-retro-green/20 p-5 rounded-xl flex flex-col justify-between bg-retro-rust/5">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-retro-rust/80">Komunikat Lawinowy</span>
-          <h3 className="text-xl font-bold text-retro-dark mt-1 mb-2 flex items-center gap-2">
-            <ShieldAlert size={20} className="text-retro-rust" /> Stopień Zagrożenia
-          </h3>
-        </div>
-        <div className="flex items-center gap-4 mt-2">
-          <div className="w-14 h-14 bg-retro-rust text-retro-beige rounded-lg flex items-center justify-center text-3xl font-black">
-            {data?.avalanche_danger_level}
-          </div>
-          <p className="text-xs font-medium text-retro-green/80 leading-snug">
-            {data?.avalanche_danger_level && data.avalanche_danger_level >= 2 
-              ? 'Wymagane doświadczenie w ocenie lokalnego ryzyka. Poruszaj się rozważnie.'
-              : 'Warunki ogólnie stabilne.'}
-          </p>
+      {/* KAFELEK 3: OPADY */}
+      <div className="bg-retro-blue/10 border-2 border-retro-blue/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-blue uppercase tracking-wider">Opady (24h)</span>
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <span className="text-3xl font-black text-retro-dark">{data.precipitation24h}</span>
+          <span className="text-sm font-bold text-retro-blue">mm wody</span>
         </div>
       </div>
 
+      {/* KAFELEK 4: NAWIERZCHNIA */}
+      <div className="bg-retro-rust/10 border-2 border-retro-rust/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-rust uppercase tracking-wider">Nawierzchnia szlaku</span>
+        <div className="mt-2 flex items-center gap-3">
+          <span className="px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wide bg-retro-rust text-white shadow-sm">
+            {data.surface.status}
+          </span>
+          {data.surface.snowDepth > 0 && <span className="text-sm text-retro-dark font-bold">{data.surface.snowDepth} cm</span>}
+        </div>
+      </div>
+
+      {/* KAFELEK 5: STOPIEŃ LAWINOWY */}
+      <div className="bg-white border-2 border-retro-green/20 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-green/60 uppercase tracking-wider">Stopień lawinowy</span>
+        <div className="mt-2 flex items-center gap-3">
+          <span className={`w-7 h-7 rounded-lg text-sm font-black flex items-center justify-center shadow-sm ${data.avalancheLevel === 1 ? 'bg-retro-green text-retro-beige' : 'bg-retro-rust text-white'}`}>
+            {data.avalancheLevel}
+          </span>
+          <span className="text-sm font-bold text-retro-dark tracking-wide">{data.avalancheLevel === 1 ? 'TPN: NISKIE' : 'TPN: PODWYŻSZONE'}</span>
+        </div>
+      </div>
+
+      {/* KAFELEK 6: PROFIL */}
+      <div className="bg-retro-green/10 border-2 border-retro-green/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <div className="flex justify-between items-center text-xs font-bold text-retro-green uppercase tracking-wider">
+          <span>Profil trasy</span>
+          <span className="font-black text-retro-dark">{data.elevation.min}m - <span className="text-retro-rust">{data.elevation.max}m</span></span>
+        </div>
+      </div>
     </div>
   );
 };

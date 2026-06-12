@@ -11,7 +11,8 @@ export default {
           beige: '#F5F2EB',
           green: '#1B3B2B',
           rust: '#B85A38',
-          blue: '#7A9A96',
+          blue: '#5B8287', 
+          yellow: '#D9A05B',
           dark: '#111A16'
         }
       },
