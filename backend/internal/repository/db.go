@@ -10,6 +10,7 @@ import (
     "net/url"
     "strings"
     "time"
+    "os"
 
     "github.com/jackc/pgx/v5/pgxpool"
 )
@@ -37,10 +38,16 @@ type OverpassPoint struct {
 
 func InitDB() *pgxpool.Pool {
     connStr := "postgres://hike_master:supersecretpassword@localhost:5433/hike_factor?sslmode=disable"
+    
+    if envString := os.Getenv("DB_CONN_STR"); envString != "" {
+        connStr = envString
+    }
+
     config, err := pgxpool.ParseConfig(connStr)
     if err != nil {
         log.Fatalf("Konfiguracja bazy błąd: %v", err)
     }
+
     pool, err := pgxpool.NewWithConfig(context.Background(), config)
     if err != nil {
         log.Fatalf("Pula połączeń błąd: %v", err)
@@ -181,5 +188,5 @@ func SeedData(pool *pgxpool.Pool) {
         savedCount++
     }
 
-    fmt.Printf("🏔️ Sukces! Baza PostGIS została zasilona idealnie przyciętymi szlakami (%d) po polskiej stronie!\n", savedCount)
+    fmt.Printf("Baza PostGIS została zasilona szlakami (%d)\n", savedCount)
 }

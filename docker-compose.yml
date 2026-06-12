@@ -1,6 +1,6 @@
 services:
-  # backend
-  postgres:
+  # baza danych PostGIS
+  db:
     image: postgis/postgis:15-3.3-alpine
     platform: linux/amd64
     container_name: hike_factor_db
@@ -11,22 +11,58 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks:
-      - hike_network
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hike_master -d hike_factor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # cache
+  # Redis
   redis:
     image: redis:7-alpine
-    container_name: hike_factor_cache
+    platform: linux/arm64
+    container_name: hike_factor_redis
     ports:
       - "6379:6379"
-    networks:
-      - hike_network
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-networks:
-  hike_network:
-    driver: bridge
+  # backend w Go
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hike_factor_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_CONN_STR=postgres://hike_master:supersecretpassword@db:5432/hike_factor?sslmode=disable
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hike_factor_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      - backend
 
 volumes:
-  pgdata:
+  postgres_data:
+  redis_data:
