@@ -12,18 +12,15 @@ interface TrailConditions {
 }
 
 export const DetailsPanel: React.FC = () => {
-  // Pobieramy ID z Twojego store'a (ustawianego przez kliknięcie na mapie)
   const selectedTrailId = useMapStore((state) => state.selectedTrailId);
 
   const { data, isLoading, error } = useQuery<TrailConditions>({
     queryKey: ['trailConditions', selectedTrailId],
     queryFn: async () => {
-      // Backend w Go teraz obsługuje parametry typu ?id=123
       const response = await fetch(`http://localhost:8080/api/trails/conditions?id=${selectedTrailId}`);
       if (!response.ok) throw new Error('Błąd pobierania danych');
       return response.json();
     },
-    // Zapytanie odpala się tylko gdy ID jest ustawione
     enabled: selectedTrailId !== null,
   });
 
@@ -31,7 +28,7 @@ export const DetailsPanel: React.FC = () => {
   if (selectedTrailId === null) {
     return (
       <div className="w-full min-h-[105px] border-2 border-dashed border-retro-green/30 rounded-xl flex items-center justify-center text-retro-blue font-bold text-sm p-4 text-center">
-        📍 Wybierz szlak na mapie, aby załadować warunki
+        📍 Wybierz szlak, aby załadować warunki
       </div>
     );
   }
@@ -40,7 +37,7 @@ export const DetailsPanel: React.FC = () => {
   if (isLoading) {
     return (
       <div className="w-full min-h-[105px] border-2 border-retro-green/20 rounded-xl flex items-center justify-center text-retro-green font-bold text-sm animate-pulse p-4 text-center">
-        ⏳ Backend Go oblicza dane dla szlaku {selectedTrailId}...
+        ⏳ Serwer oblicza dane dla szlaku...
       </div>
     );
   }
@@ -54,67 +51,136 @@ export const DetailsPanel: React.FC = () => {
     );
   }
 
-  // 4. TWÓJ ZATWIERDZONY SZABLON (dane z {data})
+  // 4. KAFELKI (dane z {data})
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+    <div className="uppercase tracking-wide grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+      
+      {/* KAFELEK 0: NAZWA SZLAKU */}
+      <div className="col-span-full bg-retro-dark text-retro-beige py-2 px-4 rounded-xl border-2 border-retro-dark flex items-center justify-center shadow-sm">
+        <h2 className="text-lg sm:text-xl font-black text-center tracking-widest">
+          {data.trail_name}
+        </h2>
+      </div>
+
       {/* KAFELEK 1: HIKE FACTOR */}
-      <div className="bg-retro-dark text-retro-beige p-4 rounded-xl flex items-center justify-between border-2 border-retro-dark min-h-[105px]">
+      <div className="bg-retro-dark/10 border-2 border-retro-dark/40 p-4 rounded-xl flex items-center justify-between min-h-[105px]">
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-retro-yellow">Hike Factor</h3>
-          <p className="text-sm font-medium opacity-90 mt-1">Ogólna ocena komfortu</p>
+          <h3 className="text-xl font-bold text-retro-dark">Hike Factor</h3>
         </div>
-        <div className="w-12 h-12 rounded-xl bg-retro-rust text-white flex items-center justify-center text-xl font-black shadow-md">
+        
+        <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black shadow-md ${
+          data.hikeFactor >= 9 ? 'bg-retro-green text-retro-beige' :
+          data.hikeFactor >= 7 ? 'bg-retro-yellow text-retro-dark' :
+          data.hikeFactor >= 4 ? 'bg-retro-orange text-retro-beige' :
+          'bg-retro-rust text-retro-beige'
+        }`}>
           {data.hikeFactor}
         </div>
       </div>
 
       {/* KAFELEK 2: POGODA */}
       <div className="bg-retro-yellow/10 border-2 border-retro-yellow/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
-        <span className="text-xs font-bold text-retro-yellow uppercase tracking-wider">Pogoda</span>
-        <div className="mt-2 flex justify-between items-baseline">
-          <span className="text-base font-black text-retro-dark">{data.weather.condition}</span>
-          <span className="text-sm font-bold text-retro-rust">{data.weather.temp}°C | {data.weather.wind} km/h</span>
+        <span className="text-xs font-bold text-retro-yellow">Pogoda</span>
+        <div className="mt-2">
+          <span className="text-lg leading-tight font-black text-retro-dark">{data.weather.condition}</span>
         </div>
       </div>
 
-      {/* KAFELEK 3: OPADY */}
-      <div className="bg-retro-blue/10 border-2 border-retro-blue/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
-        <span className="text-xs font-bold text-retro-blue uppercase tracking-wider">Opady (24h)</span>
+      {/* KAFELEK 3: TEMPERATURA */}
+      <div className="bg-retro-orange/10 border-2 border-retro-orange/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-orange">Temperatura</span>
         <div className="mt-2 flex items-baseline gap-1.5">
-          <span className="text-3xl font-black text-retro-dark">{data.precipitation24h}</span>
-          <span className="text-sm font-bold text-retro-blue">mm wody</span>
+          <span className="text-2xl font-black text-retro-dark">{data.weather.temp_min}°C</span>
+          <span className="text-sm font-bold text-retro-orange">do {data.weather.temp_max}°C</span>
         </div>
       </div>
 
-      {/* KAFELEK 4: NAWIERZCHNIA */}
-      <div className="bg-retro-rust/10 border-2 border-retro-rust/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
-        <span className="text-xs font-bold text-retro-rust uppercase tracking-wider">Nawierzchnia szlaku</span>
-        <div className="mt-2 flex items-center gap-3">
-          <span className="px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wide bg-retro-rust text-white shadow-sm">
+      {/* KAFELEK 4: WIATR */}
+      <div className="bg-retro-teal/10 border-2 border-retro-teal/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-teal">Wiatr</span>
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <span className="text-3xl font-black text-retro-dark">{data.weather.wind}</span>
+          <span className="text-sm font-bold text-retro-teal">km/h</span>
+        </div>
+      </div>
+
+      {/* KAFELEK 5: OPADY */}
+      <div className="bg-retro-blue/10 border-2 border-retro-blue/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-blue">Opady</span>
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <span className="text-3xl font-black text-retro-dark">{data.precipitation24h.level}</span>
+          <span className="text-sm font-bold text-retro-blue">mm {data.precipitation24h.type}</span>
+        </div>
+      </div>
+
+      {/* KAFELEK 6: NAWIERZCHNIA */}
+      <div className="bg-retro-brown/10 border-2 border-retro-brown/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-brown">Nawierzchnia szlaku</span>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span 
+            className={`px-3 py-1 rounded-lg text-xs font-black text-retro-beige shadow-sm ${
+              data.surface.status.toLowerCase() === 'sucho' ? 'bg-retro-green' : 'bg-retro-rust'
+            }`}
+          >
             {data.surface.status}
           </span>
-          {data.surface.snowDepth > 0 && <span className="text-sm text-retro-dark font-bold">{data.surface.snowDepth} cm</span>}
+          <span className="text-sm font-bold text-retro-dark text-right">{data.surface.description}</span>
         </div>
       </div>
 
-      {/* KAFELEK 5: STOPIEŃ LAWINOWY */}
-      <div className="bg-white border-2 border-retro-green/20 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
-        <span className="text-xs font-bold text-retro-green/60 uppercase tracking-wider">Stopień lawinowy</span>
-        <div className="mt-2 flex items-center gap-3">
-          <span className={`w-7 h-7 rounded-lg text-sm font-black flex items-center justify-center shadow-sm ${data.avalancheLevel === 1 ? 'bg-retro-green text-retro-beige' : 'bg-retro-rust text-white'}`}>
-            {data.avalancheLevel}
+      {/* KAFELEK 7: STOPIEŃ LAWINOWY */}
+      <div className="bg-retro-purple/10 border-2 border-retro-purple/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-purple">Stopień lawinowy</span>
+        
+        <div className="mt-2 flex items-center justify-between gap-3">
+          
+          <span className={`shrink-0 w-8 h-8 rounded-lg text-sm font-black flex items-center justify-center shadow-sm ${
+            data.avalanche.level == 0 ? 'bg-retro-green text-retro-beige' : 
+            data.avalanche.level == 1 ? 'bg-retro-yellow text-retro-dark' : 
+            data.avalanche.level == 2 ? 'bg-retro-orange text-retro-beige' : 
+            'bg-retro-rust text-retro-beige'
+          }`}>
+            {data.avalanche.level}
           </span>
-          <span className="text-sm font-bold text-retro-dark tracking-wide">{data.avalancheLevel === 1 ? 'TPN: NISKIE' : 'TPN: PODWYŻSZONE'}</span>
+          
+          <span className="text-sm font-bold text-retro-dark text-right">
+            {data.avalanche.description}
+          </span>
+          
         </div>
       </div>
 
-      {/* KAFELEK 6: PROFIL */}
-      <div className="bg-retro-green/10 border-2 border-retro-green/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
-        <div className="flex justify-between items-center text-xs font-bold text-retro-green uppercase tracking-wider">
-          <span>Profil trasy</span>
-          <span className="font-black text-retro-dark">{data.elevation.min}m - <span className="text-retro-rust">{data.elevation.max}m</span></span>
+      {/* KAFELEK 8: PROFIL (Zielony) */}
+      <div className="sm:col-span-2 lg:col-span-2 bg-retro-green/10 border-2 border-retro-green/40 p-4 rounded-xl flex flex-col justify-between min-h-[105px]">
+        <span className="text-xs font-bold text-retro-green">Profil trasy</span>
+        
+        <div className="mt-2 flex items-center justify-between gap-2">
+          
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-4xl font-black text-retro-dark">{data.distance}</span>
+            <span className="text-sm font-bold text-retro-green">km</span>
+          </div>
+          
+          <div className="flex flex-col items-center text-xs font-bold">
+            <span className="text-lg font-black text-retro-dark whitespace-nowrap">
+              {data.elevation.min} - <span className="text-retro-rust">{data.elevation.max}</span> m n.p.m.
+            </span>
+          </div>
+          
+          <div className="flex justify-end">
+            <span className={`px-3 py-1.5 rounded-lg text-xs font-black shadow-sm whitespace-nowrap ${
+              data.slope === "Bardzo stromo" ? "bg-retro-rust text-white" :
+              data.slope === "Stromo" ? "bg-retro-orange text-white" :
+              data.slope === "Lekkie nachylenie" ? "bg-retro-yellow text-retro-dark" :
+              "bg-retro-green text-retro-beige"
+            }`}>
+              {data.slope}
+            </span>
+          </div>
+          
         </div>
       </div>
+      
     </div>
   );
 };
