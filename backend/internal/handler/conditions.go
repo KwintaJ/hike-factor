@@ -180,8 +180,9 @@ func evaluateConditions(trailName string, meteo OpenMeteoResponse, avLevel int, 
         if windMax < iWind { windMax = iWind }
     }
 
-    if windMax > 35 { hikeFactorScore -= 1 }
-    if windMax > 60 { hikeFactorScore -= 2 }
+    if windMax > 25 { hikeFactorScore -= 1 }
+    if windMax > 45 { hikeFactorScore -= 1 }
+    if windMax > 60 { hikeFactorScore -= 1 }
 
     // opady
     rain24h := 0.0
