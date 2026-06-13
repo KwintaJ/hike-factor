@@ -1,7 +1,6 @@
 package handler
 
 import (
-    "database/sql"
     "encoding/json"
     "fmt"
     "math"
@@ -21,16 +20,17 @@ type Handler struct {
 
 type OpenMeteoResponse struct {
     Hourly struct {
-        Temperature2m   float64     `json:"temperature_2m"`
-        WeatherCode     int         `json:"weather_code"`
+        WeatherCode     []int       `json:"weather_code"`
+        Temperature2m   []float64   `json:"temperature_2m"`
+        WindSpeed10m    []float64   `json:"wind_speed_10m"`
         Rain            []float64   `json:"rain"`
         Snowfall        []float64   `json:"snowfall"`
-        WindSpeed10m    float64     `json:"wind_speed_10m"`
         SnowDepth       []float64   `json:"snow_depth"`
     } `json:"hourly"`
 }
 
 type TrailConditionsResponse struct {
+    TrailName           string          `json:"trail_name"`
     HikeFactor          int             `json:"hikeFactor"`
     Weather             WeatherInfo     `json:"weather"`
     Precipitation24h    PrecipInfo      `json:"precipitation24h"`
@@ -43,8 +43,9 @@ type TrailConditionsResponse struct {
 
 type WeatherInfo struct {
     Condition   string  `json:"condition"`
-    Temp        int     `json:"temp"`
-    Wind        int     `json:"wind"`
+    TempMin     float64 `json:"temp_min"`
+    TempMax     float64 `json:"temp_max"`
+    Wind        float64 `json:"wind"`
 }
 
 type PrecipInfo struct {
@@ -67,9 +68,10 @@ type ElevationInfo struct {
     Max int `json:"max"`
 }
 
-func (h *Handler) getTrailData(id string) (string, string, int, int, float64, error) {
+func (h *Handler) getTrailData(id string) (string, string, string, int, int, float64, error) {
     var lat, lon, dist float64
     var minElev, maxElev int
+    var trailName string
 
     query := `
         SELECT 
@@ -77,46 +79,146 @@ func (h *Handler) getTrailData(id string) (string, string, int, int, float64, er
             ST_X(ST_Centroid(geom)),
             min_elevation,
             max_elevation,
-            distance
+            distance,
+            name
         FROM trails 
         WHERE id = $1 
         LIMIT 1`
 
-    err := h.DB.QueryRow(context.Background(), query, id).Scan(&lat, &lon, &minElev, &maxElev, &dist)
+    err := h.DB.QueryRow(context.Background(), query, id).Scan(&lat, &lon, &minElev, &maxElev, &dist, &trailName)
     if err != nil {
-        return "", "", 0, 0, 0.0, err
+        return "", "", "", 0, 0, 0.0, err
     }
 
-    return fmt.Sprintf("%.6f", lat), fmt.Sprintf("%.6f", lon), minElev, maxElev, dist, nil
+    return trailName, fmt.Sprintf("%.6f", lat), fmt.Sprintf("%.6f", lon), minElev, maxElev, dist, nil
 }
 
-func interpretWeatherCode(code int) string {
-    switch {
-    case code == 0:
-        return "Słonecznie"
-    case code <= 3:
-        return "Chmury"
-    case code >= 51 && code <= 67:
-        return "Deszcz"
-    case code >= 71 && code <= 77:
-        return "Śnieg"
-    case code >= 95:
-        return "Burza"
-    default:
-        return "Zmiennie"
-    }
-}
-
-func evaluateConditions(meteo OpenMeteoResponse, avLevel int, minE int, maxE int, dist float64) TrailConditionsResponse {
+func evaluateConditions(trailName string, meteo OpenMeteoResponse, avLevel int, minE int, maxE int, dist float64) TrailConditionsResponse {
     forecastStartIdx := 72 
-    precip24h := 0.0
-    for i := 0; i < 24 && (forecastStartIdx+i) < len(meteo.Hourly.Precipitation); i++ {
-        precip24h += meteo.Hourly.Precipitation[forecastStartIdx+i]
+    hikeFactorScore := 10
+
+    // warunki
+    SunnyConditionsFreq := 0
+    OvercastConditionsFreq := 0
+    RainConditionsFreq := 0
+    SnowConditionsFreq := 0
+    StormConditionsFreq := 0
+    for i := 0; i < 24 && (forecastStartIdx + i) < len(meteo.Hourly.WeatherCode); i++ {
+        iCond := meteo.Hourly.WeatherCode[forecastStartIdx + i]
+        switch {
+            case iCond == 0:
+                SunnyConditionsFreq += 1
+            case iCond <= 3:
+                OvercastConditionsFreq += 1
+            case iCond >= 51 && iCond <= 67:
+                RainConditionsFreq += 1
+            case iCond >= 71 && iCond <= 77:
+                SnowConditionsFreq += 1
+            case iCond >= 95:
+                StormConditionsFreq += 1
+        }
     }
 
+    weatherConditions := "Zmienne warunki"
+
+    if StormConditionsFreq > 0 {
+        hikeFactorScore -= 3
+        if RainConditionsFreq > 0 {
+            weatherConditions = "Możliwe burze i opady"
+        } else {
+            weatherConditions = "Uwaga: Możliwe burze"
+        }
+    } else if SnowConditionsFreq > 0 {
+        hikeFactorScore -= 1
+        if SnowConditionsFreq > 12 {
+            weatherConditions = "Ciągłe opady śniegu"
+        } else if SunnyConditionsFreq >= 4 {
+            weatherConditions = "Słonecznie, przelotne opady śniegu"
+        } else {
+            weatherConditions = "Pochmurno, przelotne opady śniegu"
+        }
+    } else if RainConditionsFreq > 0 {
+        hikeFactorScore -= 1
+        if RainConditionsFreq > 12 {
+            hikeFactorScore -= 1
+            weatherConditions = "Deszczowo przez większość dnia"
+        } else if SunnyConditionsFreq >= 5 {
+            weatherConditions = "Słonecznie, przelotne opady deszczu"
+        } else {
+            weatherConditions = "Pochmurno z przelotnymi opadami"
+        }
+    } else {
+        if SunnyConditionsFreq >= 20 {
+            weatherConditions = "Słonecznie cały dzień"
+        } else if OvercastConditionsFreq >= 20 {
+            weatherConditions = "Całkowite zachmurzenie"
+        } else if SunnyConditionsFreq > OvercastConditionsFreq {
+            weatherConditions = "Przeważnie słonecznie"
+        } else {
+            weatherConditions = "Zachmurzenie z przejaśnieniami"
+        }
+    }
+
+    // temperatura
+    tempMax := -200.0
+    tempMin := 200.0
+    for i := 0; i < 24 && (forecastStartIdx + i) < len(meteo.Hourly.Temperature2m); i++ {
+        iTemp := meteo.Hourly.Temperature2m[forecastStartIdx + i]
+        if tempMax < iTemp { tempMax = iTemp }
+        if tempMin > iTemp { tempMin = iTemp }
+    }
+
+    if tempMin < 4   { hikeFactorScore -= 1 }
+    if tempMin < -12 { hikeFactorScore -= 1 }
+    if tempMax > 25  { hikeFactorScore -= 1 }
+    if tempMax > 32  { hikeFactorScore -= 1 }
+
+    // wiatr
+    windMax := 0.0
+    for i := 0; i < 24 && (forecastStartIdx + i) < len(meteo.Hourly.WindSpeed10m); i++ {
+        iWind := meteo.Hourly.WindSpeed10m[forecastStartIdx + i]
+        if windMax < iWind { windMax = iWind }
+    }
+
+    if windMax > 35 { hikeFactorScore -= 1 }
+    if windMax > 60 { hikeFactorScore -= 2 }
+
+    // opady
+    rain24h := 0.0
+    for i := 0; i < 24 && (forecastStartIdx + i) < len(meteo.Hourly.Rain); i++ {
+        rain24h += meteo.Hourly.Rain[forecastStartIdx + i]
+    }
+
+    snow24h := 0.0
+    for i := 0; i < 24 && (forecastStartIdx + i) < len(meteo.Hourly.Snowfall); i++ {
+        snow24h += meteo.Hourly.Snowfall[forecastStartIdx + i]
+    }
+
+    precip24h := rain24h + snow24h
+
+    precipType := ""
+    if rain24h > 0 && snow24h > 0 {
+        precipType = "deszczu ze śniegiem"
+    } else if rain24h > 0 {
+        precipType = "deszczu"
+    } else if snow24h > 0 {
+        precipType = "śniegu"
+    }
+
+
+    // powierzchnia
     pastPrecip := 0.0
-    for i := 0; i < forecastStartIdx && i < len(meteo.Hourly.Precipitation); i++ {
-        pastPrecip += meteo.Hourly.Precipitation[i]
+    lastRainTime := -1
+    lastSnowTime := -1
+    for i := 0; i < forecastStartIdx && i < len(meteo.Hourly.Rain); i++ {
+        iRain := meteo.Hourly.Rain[i]
+        pastPrecip += iRain
+        if(iRain > 0) { lastRainTime = i }
+    }
+    for i := 0; i < forecastStartIdx && i < len(meteo.Hourly.Snowfall); i++ {
+        iSnow := meteo.Hourly.Snowfall[i]
+        pastPrecip += iSnow
+        if(iSnow > 0) { lastSnowTime = i }
     }
 
     currentSnow := 0
@@ -126,94 +228,101 @@ func evaluateConditions(meteo OpenMeteoResponse, avLevel int, minE int, maxE int
 
     surfaceStatus := "Sucho"
     if currentSnow > 5 {
+        hikeFactorScore -= 1
         surfaceStatus = "Śnieg"
     } else if pastPrecip > 2.0 || precip24h > 1.0 {
+        hikeFactorScore -= 1
         surfaceStatus = "Ślisko"
     }
 
-    surfDescription := "Deszcz x godzin temu"
+    surfDescription := "Nie padało od 3 dni"
+    if lastRainTime != -1 {
+        surfDescription = fmt.Sprintf("Deszcz %d godzin temu", 72 - lastRainTime)
+    } else if lastRainTime == forecastStartIdx {
+        surfDescription = "Pada deszcz"
+    } else if lastSnowTime != -1 {
+        surfDescription = fmt.Sprintf("Śnieg %d godzin temu", 72 - lastSnowTime)
+    } else if lastSnowTime == forecastStartIdx {
+        surfDescription = "Pada śnieg"
+    }
 
+
+    // zagrożenie lawinowe
+    avDescription := "Zagrożenie lawinowe nieznane"
+
+    switch avLevel {
+        case 0:
+            avDescription = "Brak zagrożenia lawinowego"
+        case 1:
+            avDescription = "Niski stopień zagrożenia"
+            hikeFactorScore -= 1
+        case 2:
+            avDescription = "Umiarkowane zagrożenie lawinowe"
+            hikeFactorScore -= 2
+        case 3:
+            avDescription = "Znaczne zagrożenie lawinowe - wymaga doświadczenia taternickiego"
+            hikeFactorScore -= 4
+        case 4:
+            avDescription = "Wysokie zagrożenie lawinowe - wymaga eksperckiej wiedzy lawinoznawczej"
+            hikeFactorScore -= 6
+        case 5:
+            avDescription = "Bardzo wysokie zagrożenie lawinowe - zostań w domu"
+            hikeFactorScore = -1000
+    }
+
+
+    // profil trasy
     slope := "Płasko"
-
-    score := 10
-
-    if avLevel == 2 { score -= 2 }
-    if avLevel == 3 { score -= 5 }
-    if avLevel >= 4 { score -= 10 }
-
-    avDescription := "Brak zagrożenia lawinowego"
-
-    if meteo.Current.WeatherCode >= 95 {
-        score -= 4 
-    } else if meteo.Current.WeatherCode >= 71 {
-        score -= 3
-    } else if meteo.Current.WeatherCode >= 51 {
-        score -= 2
+    
+    if dist > 0 {
+        elevationDiff := float64(maxE - minE)
+        gainPerKm := elevationDiff / dist
+        switch {
+            case gainPerKm >= 50 && gainPerKm < 140:
+                slope = "Lekkie nachylenie"
+            case gainPerKm >= 140 && gainPerKm < 275:
+                hikeFactorScore -= 1
+                slope = "Stromo"
+            case gainPerKm >= 275:
+                hikeFactorScore -= 2
+                slope = "Bardzo stromo"
+        }
     }
 
-    if meteo.Current.Temperature2m < -10 || meteo.Current.Temperature2m > 30 {
-        score -= 2
-    }
-    if meteo.Current.WindSpeed10m > 60 {
-        score -= 4
-    } else if meteo.Current.WindSpeed10m > 40 {
-        score -= 2
+    // hike factor reset to 1
+    if hikeFactorScore < 1 {
+        hikeFactorScore = 1
     }
 
-    if surfaceStatus == "Ślisko" {
-        score -= 2
-    } else if surfaceStatus == "Śnieg" {
-        score -= 3
-    }
-
-    if maxE - minE <= 600 {
-        score -= 1
-    }
-
-    if score < 1 {
-        score = 1
-    }
-
+    // return conditions
     return TrailConditionsResponse{
-        HikeFactor: score,
+        TrailName:          trailName,
+        HikeFactor:         hikeFactorScore,
         Weather: WeatherInfo{
-            Condition: interpretWeatherCode(meteo.Current.WeatherCode),
-            Temp:      int(math.Round(meteo.Current.Temperature2m)),
-            Wind:      int(math.Round(meteo.Current.WindSpeed10m)),
+            Condition:      weatherConditions,
+            TempMin:        tempMin,
+            TempMax:        tempMax,
+            Wind:           windMax,
         },
         Precipitation24h: PrecipInfo{
-            Level: math.Round(precip24h*10) / 10,
-            Type: "deszczu",
+            Level:          math.Round(precip24h*10) / 10,
+            Type:           precipType,
         },
         Surface: SurfaceInfo{
-            Status:      surfaceStatus,
-            Description: surfDescription,
+            Status:         surfaceStatus,
+            Description:    surfDescription,
         },
-        Avalanche:      AlavancheInfo{Level: avLevel, Description: avDescription},
-        Elevation:      ElevationInfo{Min: minE, Max: maxE}, 
-        Distance:       dist,
-        Slope:          slope,
+        Avalanche: AlavancheInfo{
+            Level:          avLevel, 
+            Description:    avDescription,
+        },
+        Elevation: ElevationInfo{
+            Min:    minE,
+            Max:    maxE,
+        }, 
+        Distance:   dist,
+        Slope:      slope,
     }
-}
-
-func getTrailCoordsById(db *sql.DB, id string) (string, string, error) {
-    var lat, lon float64
-
-    query := `
-        SELECT ST_Y(ST_Centroid(geom)), ST_X(ST_Centroid(geom)) 
-        FROM trails 
-        WHERE id = $1 
-        LIMIT 1`
-
-    err := db.QueryRow(query, id).Scan(&lat, &lon)
-    if err != nil {
-        if err == sql.ErrNoRows {
-            return "", "", fmt.Errorf("szlak o ID %s nie istnieje", id)
-        }
-        return "", "", err
-    }
-
-    return fmt.Sprintf("%.6f", lat), fmt.Sprintf("%.6f", lon), nil
 }
 
 func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
@@ -222,16 +331,14 @@ func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
         return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing id parameter"})
     }
 
-    lat, lon, minElev, maxElev, dist, err := h.getTrailData(id)
+    trailName, lat, lon, minElev, maxElev, dist, err := h.getTrailData(id)
     if err != nil {
         fmt.Printf("DEBUG: Błąd pobierania danych dla ID %s: %v\n", id, err)
         return c.JSON(http.StatusNotFound, map[string]string{"error": "Trail not found or DB error"})
     }
 
-    fmt.Printf("DEBUG: Pobrano szlak ID %s: Elev %s - %s\n", id, minElev, maxElev)
-
     apiURL := fmt.Sprintf(
-        "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&hourly=temperature_2m,weather_code,rain,snowfall,wind_speed_10m,snow_depth&past_days=3&forecast_days=1",
+        "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&hourly=weather_code,temperature_2m,wind_speed_10m,rain,snowfall,snow_depth&past_days=3&forecast_days=1",
         lat, lon,
     )
 
@@ -248,6 +355,6 @@ func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
 
     avLevel := avalanche.GetAvalancheLevel()
 
-    report := evaluateConditions(meteoData, avLevel, minElev, maxElev, dist)
+    report := evaluateConditions(trailName, meteoData, avLevel, minElev, maxElev, dist)
     return c.JSON(http.StatusOK, report)
 }
