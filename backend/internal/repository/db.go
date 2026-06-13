@@ -12,19 +12,19 @@ import (
 )
 
 type OverpassResponse struct {
-    Elements []OverpassElement `json:"elements"`
+    Elements    []OverpassElement   `json:"elements"`
 }
 
 type OverpassElement struct {
-    Type    string            `json:"type"`
-    ID      int64             `json:"id"`
-    Members []OverpassMember  `json:"members"`
-    Tags    map[string]string `json:"tags"`
+    Type        string              `json:"type"`
+    ID          int64               `json:"id"`
+    Members     []OverpassMember    `json:"members"`
+    Tags        map[string]string   `json:"tags"`
 }
 
 type OverpassMember struct {
-    Type     string          `json:"type"`
-    Geometry []OverpassPoint `json:"geometry"`
+    Type        string              `json:"type"`
+    Geometry    []OverpassPoint     `json:"geometry"`
 }
 
 type OverpassPoint struct {
