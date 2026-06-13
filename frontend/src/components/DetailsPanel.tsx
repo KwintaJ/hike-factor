@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useMapStore } from '../store/useMapStore'; // Import Twojego store
+import { useMapStore } from '../store/useMapStore';
 
 interface TrailConditions {
   hikeFactor: number;
@@ -46,7 +46,7 @@ export const DetailsPanel: React.FC = () => {
   if (error || !data) {
     return (
       <div className="w-full min-h-[105px] bg-retro-rust/10 border-2 border-retro-rust/40 rounded-xl flex items-center justify-center text-retro-rust font-bold text-sm p-4 text-center">
-        ⚠️ Błąd połączenia z serwerem. Upewnij się, że backend obsługuje parametr ID.
+        ⚠️ Błąd połączenia z serwerem
       </div>
     );
   }
@@ -91,7 +91,7 @@ export const DetailsPanel: React.FC = () => {
         <span className="text-xs font-bold text-retro-orange">Temperatura</span>
         <div className="mt-2 flex items-baseline gap-1.5">
           <span className="text-2xl font-black text-retro-dark">{data.weather.temp_min}°C</span>
-          <span className="text-sm font-bold text-retro-orange">do {data.weather.temp_max}°C</span>
+          <span className="text-sm font-bold text-retro-orange">- {data.weather.temp_max}°C</span>
         </div>
       </div>
 
