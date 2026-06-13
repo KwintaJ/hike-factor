@@ -8,6 +8,7 @@ export const MapView: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const setSelectedTrailId = useMapStore((state) => state.setSelectedTrailId);
+  const selectedTrailId = useMapStore((state) => state.selectedTrailId);
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
@@ -83,8 +84,20 @@ export const MapView: React.FC = () => {
     };
   }, [setSelectedTrailId]);
 
+  useEffect(() => {
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.resize();
+      }, 50);
+    }
+  }, [selectedTrailId]);
+
+  const isTrailSelected = selectedTrailId !== null;
+
   return (
-    <div className="relative w-full h-[42vh] rounded-2xl border-2 border-retro-green overflow-hidden shadow-lg">
+    <div className={`relative w-full transition-all duration-500 ease-in-out ${
+      isTrailSelected ? 'h-[42vh]' : 'h-[84vh]'
+    } rounded-2xl border-2 border-retro-green overflow-hidden shadow-lg`}>
       <div ref={mapContainer} className="w-full h-full" />
     </div>
   );
