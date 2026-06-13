@@ -5,8 +5,8 @@
 @import 'maplibre-gl/dist/maplibre-gl.css';
 
 body {
-  background-color: #F5F2EB;
-  color: #1B3B2B;
+  background-color: #EAE4D8;
+  color: #23362D;
   margin: 0;
   font-family: system-ui, sans-serif;
 }
@@ -64,7 +64,7 @@ body {
 }
 
 #root {
-  width: 1226px;
+  width: 1400px;
   max-width: 100%;
   margin: 0 auto;
   text-align: center;

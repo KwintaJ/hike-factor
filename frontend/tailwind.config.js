@@ -8,12 +8,16 @@ export default {
     extend: {
       colors: {
         retro: {
-          beige: '#F5F2EB',
-          green: '#1B3B2B',
+          beige: '#EAE4D8',
+          green: '#5C6B28',
           rust: '#B85A38',
           blue: '#5B8287', 
           yellow: '#D9A05B',
-          dark: '#111A16'
+          dark: '#23362D',
+          orange: '#D97736',
+          teal: '#3D8C8F',
+          brown: '#A06B50',
+          purple: '#7D5C77',
         }
       },
       fontFamily: {
