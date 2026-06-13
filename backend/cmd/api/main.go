@@ -6,6 +6,7 @@ import (
 
 	"hike-factor/internal/handler"
 	"hike-factor/internal/repository"
+	"hike-factor/internal/avalanche"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -18,6 +19,8 @@ func main() {
 	dbPool := repository.InitDB()
 	defer dbPool.Close()
 	repository.SeedData(dbPool)
+
+	avalanche.StartAvalancheWorker()
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"context"
 
+	"hike-factor/internal/avalanche"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	_ "github.com/lib/pq"
@@ -34,8 +36,10 @@ type TrailConditionsResponse struct {
 	Weather          WeatherInfo   `json:"weather"`
 	Precipitation24h float64       `json:"precipitation24h"`
 	Surface          SurfaceInfo   `json:"surface"`
-	AvalancheLevel   int           `json:"avalancheLevel"`
+	Avalanche        AlavancheInfo `json:"avalanche"`
 	Elevation        ElevationInfo `json:"elevation"`
+	Distance		 float64	   `json:"distance"`
+	Slope			 string		   `json:"slope"`
 }
 
 type WeatherInfo struct {
@@ -45,8 +49,13 @@ type WeatherInfo struct {
 }
 
 type SurfaceInfo struct {
-	Status    string `json:"status"`
-	SnowDepth int    `json:"snowDepth"`
+	Status    	 string `json:"status"`
+	Description  string `json:"description"`
+}
+
+type AlavancheInfo struct {
+	Level 		int 	`json:"level"`
+	Description string	`json:"description"`
 }
 
 type ElevationInfo struct {
@@ -54,8 +63,8 @@ type ElevationInfo struct {
 	Max int `json:"max"`
 }
 
-func (h *Handler) getTrailData(id string) (string, string, int, int, error) {
-	var lat, lon float64
+func (h *Handler) getTrailData(id string) (string, string, int, int, float64, error) {
+	var lat, lon, dist float64
 	var minElev, maxElev int
 
 	query := `
@@ -63,17 +72,18 @@ func (h *Handler) getTrailData(id string) (string, string, int, int, error) {
 			ST_Y(ST_Centroid(geom)), 
 			ST_X(ST_Centroid(geom)),
 			min_elevation,
-			max_elevation
+			max_elevation,
+			distance
 		FROM trails 
 		WHERE id = $1 
 		LIMIT 1`
 
-	err := h.DB.QueryRow(context.Background(), query, id).Scan(&lat, &lon, &minElev, &maxElev)
+	err := h.DB.QueryRow(context.Background(), query, id).Scan(&lat, &lon, &minElev, &maxElev, &dist)
 	if err != nil {
-		return "", "", 0, 0, err
+		return "", "", 0, 0, 0.0, err
 	}
 
-	return fmt.Sprintf("%.6f", lat), fmt.Sprintf("%.6f", lon), minElev, maxElev, nil
+	return fmt.Sprintf("%.6f", lat), fmt.Sprintf("%.6f", lon), minElev, maxElev, dist, nil
 }
 
 func interpretWeatherCode(code int) string {
@@ -93,7 +103,7 @@ func interpretWeatherCode(code int) string {
 	}
 }
 
-func evaluateConditions(meteo OpenMeteoResponse, avalanche int, minE int, maxE int) TrailConditionsResponse {
+func evaluateConditions(meteo OpenMeteoResponse, avLevel int, minE int, maxE int, dist float64) TrailConditionsResponse {
 	forecastStartIdx := 72 
 	precip24h := 0.0
 	for i := 0; i < 24 && (forecastStartIdx+i) < len(meteo.Hourly.Precipitation); i++ {
@@ -117,11 +127,17 @@ func evaluateConditions(meteo OpenMeteoResponse, avalanche int, minE int, maxE i
 		surfaceStatus = "Ślisko"
 	}
 
+	surfDescription := "Deszcz x godzin temu"
+
+	slope := "Płasko"
+
 	score := 10
 
-	if avalanche == 2 { score -= 2 }
-	if avalanche == 3 { score -= 5 }
-	if avalanche >= 4 { score -= 10 }
+	if avLevel == 2 { score -= 2 }
+	if avLevel == 3 { score -= 5 }
+	if avLevel >= 4 { score -= 10 }
+
+	avDescription := "Brak zagrożenia lawinowego"
 
 	if meteo.Current.WeatherCode >= 95 {
 		score -= 4 
@@ -163,11 +179,13 @@ func evaluateConditions(meteo OpenMeteoResponse, avalanche int, minE int, maxE i
 		},
 		Precipitation24h: math.Round(precip24h*10) / 10,
 		Surface: SurfaceInfo{
-			Status:    surfaceStatus,
-			SnowDepth: currentSnow,
+			Status:      surfaceStatus,
+			Description: surfDescription,
 		},
-		AvalancheLevel: avalanche,
+		Avalanche: 		AlavancheInfo{Level: avLevel, Description: avDescription},
 		Elevation:      ElevationInfo{Min: minE, Max: maxE}, 
+		Distance:       dist,
+		Slope:			slope,
 	}
 }
 
@@ -197,7 +215,7 @@ func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing id parameter"})
 	}
 
-	lat, lon, minElev, maxElev, err := h.getTrailData(id)
+	lat, lon, minElev, maxElev, dist, err := h.getTrailData(id)
 	if err != nil {
 		fmt.Printf("DEBUG: Błąd pobierania danych dla ID %s: %v\n", id, err)
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "Trail not found or DB error"})
@@ -221,6 +239,8 @@ func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Parse error"})
 	}
 
-	report := evaluateConditions(meteoData, 1, minElev, maxElev)
+	avLevel := avalanche.GetAvalancheLevel()
+
+	report := evaluateConditions(meteoData, avLevel, minElev, maxElev, dist)
 	return c.JSON(http.StatusOK, report)
 }
