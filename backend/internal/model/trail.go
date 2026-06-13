@@ -1,10 +1,5 @@
 package model
 
-type Geometry struct {
-    Type            string      `json:"type"`
-    Coordinates     [][]float64 `json:"coordinates"`
-}
-
 type Trail struct {
     ID              int         `json:"id"`
     Name            string      `json:"name"`
@@ -14,4 +9,9 @@ type Trail struct {
     MaxElevation    int         `json:"max_elevation"`
     Distance        float64     `json:"distance"`
     Geometry        Geometry    `json:"geometry"`
+}
+
+type Geometry struct {
+    Type            string      `json:"type"`
+    Coordinates     [][]float64 `json:"coordinates"`
 }

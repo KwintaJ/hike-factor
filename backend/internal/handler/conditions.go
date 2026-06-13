@@ -7,16 +7,11 @@ import (
     "net/http"
     "context"
 
+    "hike-factor/internal/model"
     "hike-factor/internal/avalanche"
 
-    "github.com/jackc/pgx/v5/pgxpool"
     "github.com/labstack/echo/v4"
-    _ "github.com/lib/pq"
 )
-
-type Handler struct {
-    DB *pgxpool.Pool
-}
 
 type OpenMeteoResponse struct {
     Hourly struct {
@@ -29,46 +24,7 @@ type OpenMeteoResponse struct {
     } `json:"hourly"`
 }
 
-type TrailConditionsResponse struct {
-    TrailName           string          `json:"trail_name"`
-    HikeFactor          int             `json:"hikeFactor"`
-    Weather             WeatherInfo     `json:"weather"`
-    Precipitation24h    PrecipInfo      `json:"precipitation24h"`
-    Surface             SurfaceInfo     `json:"surface"`
-    Avalanche           AlavancheInfo   `json:"avalanche"`
-    Elevation           ElevationInfo   `json:"elevation"`
-    Distance            float64         `json:"distance"`
-    Slope               string          `json:"slope"`
-}
-
-type WeatherInfo struct {
-    Condition   string  `json:"condition"`
-    TempMin     float64 `json:"temp_min"`
-    TempMax     float64 `json:"temp_max"`
-    Wind        float64 `json:"wind"`
-}
-
-type PrecipInfo struct {
-    Level   float64     `json:"level"`
-    Type    string      `json:"type"`
-}
-
-type SurfaceInfo struct {
-    Status      string  `json:"status"`
-    Description string  `json:"description"`
-}
-
-type AlavancheInfo struct {
-    Level       int     `json:"level"`
-    Description string  `json:"description"`
-}
-
-type ElevationInfo struct {
-    Min int `json:"min"`
-    Max int `json:"max"`
-}
-
-func (h *Handler) getTrailData(id string) (string, string, string, int, int, float64, error) {
+func (h *Handler) getTrailData(id string) (model.Trail, string, string, error) {
     var lat, lon, dist float64
     var minElev, maxElev int
     var trailName string
@@ -87,13 +43,18 @@ func (h *Handler) getTrailData(id string) (string, string, string, int, int, flo
 
     err := h.DB.QueryRow(context.Background(), query, id).Scan(&lat, &lon, &minElev, &maxElev, &dist, &trailName)
     if err != nil {
-        return "", "", "", 0, 0, 0.0, err
+        return model.Trail{}, "", "", err
     }
 
-    return trailName, fmt.Sprintf("%.6f", lat), fmt.Sprintf("%.6f", lon), minElev, maxElev, dist, nil
+    return model.Trail {
+        Name: trailName,
+        MinElevation: minElev,
+        MaxElevation: maxElev,
+        Distance: dist,
+    }, fmt.Sprintf("%.6f", lat), fmt.Sprintf("%.6f", lon), nil
 }
 
-func evaluateConditions(trailName string, meteo OpenMeteoResponse, avLevel int, minE int, maxE int, dist float64) TrailConditionsResponse {
+func evaluateConditions(trail model.Trail, meteo OpenMeteoResponse, avLevel int) model.TrailConditions {
     forecastStartIdx := 72 
     hikeFactorScore := 10
 
@@ -275,9 +236,9 @@ func evaluateConditions(trailName string, meteo OpenMeteoResponse, avLevel int, 
     // profil trasy
     slope := "Płasko"
     
-    if dist > 0 {
-        elevationDiff := float64(maxE - minE)
-        gainPerKm := elevationDiff / dist
+    if trail.Distance > 0 {
+        elevationDiff := float64(trail.MaxElevation - trail.MinElevation)
+        gainPerKm := elevationDiff / trail.Distance
         switch {
             case gainPerKm >= 50 && gainPerKm < 140:
                 slope = "Lekkie nachylenie"
@@ -296,32 +257,32 @@ func evaluateConditions(trailName string, meteo OpenMeteoResponse, avLevel int, 
     }
 
     // return conditions
-    return TrailConditionsResponse{
-        TrailName:          trailName,
+    return model.TrailConditions{
+        TrailName:          trail.Name,
         HikeFactor:         hikeFactorScore,
-        Weather: WeatherInfo{
+        Weather: model.WeatherInfo{
             Condition:      weatherConditions,
             TempMin:        tempMin,
             TempMax:        tempMax,
             Wind:           windMax,
         },
-        Precipitation24h: PrecipInfo{
+        Precipitation24h: model.PrecipInfo{
             Level:          math.Round(precip24h*10) / 10,
             Type:           precipType,
         },
-        Surface: SurfaceInfo{
+        Surface: model.SurfaceInfo{
             Status:         surfaceStatus,
             Description:    surfDescription,
         },
-        Avalanche: AlavancheInfo{
+        Avalanche: model.AlavancheInfo{
             Level:          avLevel, 
             Description:    avDescription,
         },
-        Elevation: ElevationInfo{
-            Min:    minE,
-            Max:    maxE,
+        Elevation: model.ElevationInfo{
+            Min:    trail.MinElevation,
+            Max:    trail.MaxElevation,
         }, 
-        Distance:   dist,
+        Distance:   trail.Distance,
         Slope:      slope,
     }
 }
@@ -332,7 +293,7 @@ func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
         return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing id parameter"})
     }
 
-    trailName, lat, lon, minElev, maxElev, dist, err := h.getTrailData(id)
+    trail, lat, lon, err := h.getTrailData(id)
     if err != nil {
         fmt.Printf("DEBUG: Błąd pobierania danych dla ID %s: %v\n", id, err)
         return c.JSON(http.StatusNotFound, map[string]string{"error": "Trail not found or DB error"})
@@ -356,6 +317,6 @@ func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
 
     avLevel := avalanche.GetAvalancheLevel()
 
-    report := evaluateConditions(trailName, meteoData, avLevel, minElev, maxElev, dist)
+    report := evaluateConditions(trail, meteoData, avLevel)
     return c.JSON(http.StatusOK, report)
 }
