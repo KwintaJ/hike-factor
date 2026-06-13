@@ -12,24 +12,21 @@ export const MapView: React.FC = () => {
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
 
-    // Ładujemy kompletny, czysty styl wektorowy Topo bezpośrednio z serwerów MapTiler
     const map = new maplibregl.Map({
       container: mapContainer.current,
       style: `https://api.maptiler.com/maps/topo-v2/style.json?key=${MAPTILER_KEY}`,
-      center: [20.0150, 49.2550], // Centrowanie na Tatry Wysokie i Zachodnie
-      zoom: 12.5,
+      center: [19.9464, 49.2602],
+      zoom: 12,
     });
 
     mapRef.current = map;
 
     map.on('load', () => {
-      // Wstrzykujemy Twoje dane przestrzenne z PostGIS jako nowe źródło na mapie wektorowej
       map.addSource('tatry-trails', {
         type: 'geojson',
         data: 'http://localhost:8080/api/trails',
       });
 
-      // Warstwa bazowa szlaków
       map.addLayer({
         id: 'trails-layer',
         type: 'line',
@@ -44,7 +41,6 @@ export const MapView: React.FC = () => {
         },
       });
 
-      // Warstwa podświetlenia (glow) po kliknięciu
       map.addLayer({
         id: 'trails-highlight',
         type: 'line',
@@ -58,7 +54,6 @@ export const MapView: React.FC = () => {
         filter: ['==', ['get', 'id'], ''],
       });
 
-      // Zmiana zachowania kursora
       map.on('mouseenter', 'trails-layer', () => {
         map.getCanvas().style.cursor = 'pointer';
       });
@@ -67,7 +62,6 @@ export const MapView: React.FC = () => {
         map.getCanvas().style.cursor = '';
       });
 
-      // Kliknięcie w szlak (zwraca pełną relację jako jeden obiekt)
       map.on('click', 'trails-layer', (e) => {
         if (e.features && e.features.length > 0) {
           const feature = e.features[0];
@@ -90,7 +84,7 @@ export const MapView: React.FC = () => {
   }, [setSelectedTrailId]);
 
   return (
-    <div className="relative w-full h-[65vh] rounded-2xl border-2 border-retro-green overflow-hidden shadow-lg">
+    <div className="relative w-full h-[42vh] rounded-2xl border-2 border-retro-green overflow-hidden shadow-lg">
       <div ref={mapContainer} className="w-full h-full" />
     </div>
   );
