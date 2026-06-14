@@ -193,23 +193,39 @@ func evaluateConditions(trail model.Trail, meteo OpenMeteoResponse, avLevel int)
     }
 
     surfaceStatus := "Sucho"
+
+    hoursSinceRain := 999
+    if lastRainTime != -1 {
+        hoursSinceRain = 72 - lastRainTime
+    }
+
     if currentSnow > 5 {
         hikeFactorScore -= 1
         surfaceStatus = "Śnieg"
-    } else if pastPrecip > 2.0 || precip24h > 1.0 {
-        hikeFactorScore -= 1
-        surfaceStatus = "Ślisko"
+    } else if pastPrecip > 2.5 || precip24h > 1.0 {
+        isDryingOut := hoursSinceRain > 24 && precip24h <= 0
+
+        if !isDryingOut {
+            hikeFactorScore -= 1
+            surfaceStatus = "Ślisko"
+        }
     }
 
     surfDescription := "Nie padało od 3 dni"
     if lastRainTime != -1 {
-        surfDescription = fmt.Sprintf("Deszcz %d godzin temu", 72 - lastRainTime)
-    } else if lastRainTime == forecastStartIdx {
-        surfDescription = "Pada deszcz"
+        hoursAgo := 72 - lastRainTime
+        if hoursAgo <= 2 {
+            surfDescription = "Pada deszcz"
+        } else {
+            surfDescription = fmt.Sprintf("Deszcz %d godzin temu", hoursAgo)
+        }
     } else if lastSnowTime != -1 {
-        surfDescription = fmt.Sprintf("Śnieg %d godzin temu", 72 - lastSnowTime)
-    } else if lastSnowTime == forecastStartIdx {
-        surfDescription = "Pada śnieg"
+        hoursAgo := 72 - lastSnowTime
+        if hoursAgo <= 2 {
+            surfDescription = "Pada śnieg"
+        } else {
+            surfDescription = fmt.Sprintf("Śnieg %d godzin temu", hoursAgo)
+        }
     }
 
 
