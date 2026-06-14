@@ -5,7 +5,7 @@ import { TopNav } from './components/TopNav';
 import { MapView } from './components/MapView';
 import { DetailsPanel } from './components/DetailsPanel';
 import { AuthForm } from './components/AuthForm';
-// import { FavoritesView } from './components/FavoritesView';
+import { FavoritesView } from './components/FavoritesView';
 
 const queryClient = new QueryClient();
 
@@ -14,6 +14,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const setSelectedTrailId = useMapStore((state) => state.setSelectedTrailId);
   const setAuthView = useMapStore((state) => state.setAuthView);
+  const setFavoriteTrailIds = useMapStore((state) => state.setFavoriteTrailIds);
 
   const handleResetMap = () => {
     setSelectedTrailId(null);
@@ -27,9 +28,7 @@ export default function App() {
 
       try {
         const response = await fetch('http://localhost:8080/api/validate-token', {
-          headers: { 
-            'Authorization': `Bearer ${token}` 
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
@@ -46,6 +45,30 @@ export default function App() {
 
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setFavoriteTrailIds([]);
+      return;
+    }
+
+    const fetchFavoriteIds = async () => {
+      const token = localStorage.getItem('jwt_token');
+      try {
+        const response = await fetch('http://localhost:8080/api/favorites', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setFavoriteTrailIds(data.map((item: { id: number }) => item.id));
+        }
+      } catch (err) {
+        console.error("Błąd pobierania ID ulubionych:", err);
+      }
+    };
+
+    fetchFavoriteIds();
+  }, [isLoggedIn, setFavoriteTrailIds]);
 
   useEffect(() => {
     setAuthView(currentView === 'auth');
@@ -76,25 +99,26 @@ export default function App() {
           />
 
           <main className="w-full flex flex-col gap-6">
-            <MapView />
+            <div className={currentView === 'favorites' ? 'hidden' : 'w-full'}>
+              <MapView />
+            </div>
             
             {currentView === 'home' && (
               <div className="w-full">
-                <DetailsPanel />
+                <DetailsPanel isLoggedIn={isLoggedIn} />
               </div>
             )}
 
-            {(currentView === 'auth' || currentView === 'favorites') && (
+            {currentView === 'favorites' && isLoggedIn && (
+              <div className="w-full bg-white/40 p-4 sm:p-8 rounded-2xl border border-retro-dark/10 shadow-sm backdrop-blur-sm">
+                <FavoritesView onViewChange={setCurrentView} isLoggedIn={isLoggedIn} />
+              </div>
+            )}
+
+            {currentView === 'auth' && !isLoggedIn && (
               <div className="w-full flex justify-center py-10">
                 <div className="w-full max-w-md">
-                  {currentView === 'favorites' && isLoggedIn && (
-                    <div className="p-8 bg-white/90 rounded-xl shadow-lg border border-retro-dark/10">
-                      <h2 className="text-xl font-bold text-retro-dark">Twoje ulubione szlaki</h2>
-                    </div>
-                  )}
-                  {currentView === 'auth' && !isLoggedIn && (
-                    <AuthForm onLogin={handleLoginSuccess} />
-                  )}
+                  <AuthForm onLogin={handleLoginSuccess} />
                 </div>
               </div>
             )}
