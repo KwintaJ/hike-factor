@@ -15,9 +15,9 @@ System hike-factor ma pomóc turystom i pasjonatom wędrówek górskich w sytuac
 
 | Route                             | Cel widoku                                                                                                                                    | Aktor                 | Kluczowe komponenty                                                           |
 | :-------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------- | :---------------------------------------------------------------------------- |
-| `/ `                              | Główny pulpit decyzyjny: Interaktywna mapa Tatr z nakładkami warstw oraz dolny panel szczegółów szlaku (profil, nachylenie, hike-factor).     | Każdy                 | `TatryMap`, `LayersConfigPanel`, `ConditionDetailsPanel`, `HikeFactorBadge`   |
-| `/favorites`                      | Zarządzanie trasami: Lista obserwowanych przez użytkownika szlaków z agregacją ich aktualnego statusu i alertów.                              | Turysta zalogowany    | `FavoritesList`, `QuickStatusCard`                                            |
-| `/auth/login` `/auth/register`    | Uwierzytelnianie: Logowanie i rejestracja użytkowników w celu ochrony endpointów zapisu.                                                      | Turysta niezalogowany | `LoginForm`, `RegisterForm`                                                   |
+| `/ `                              | Główny pulpit decyzyjny: Interaktywna mapa Tatr z nakładkami warstw oraz dolny panel szczegółów szlaku (profil, nachylenie, hike-factor).     | Każdy                 | `MapView`, `DetailsPanel`,                                                    | 
+| `/favorites`                      | Zarządzanie trasami: Lista obserwowanych przez użytkownika szlaków z agregacją ich aktualnego statusu i alertów.                              | Turysta zalogowany    | `FavoritesView`, `DetailsPanel` dla każdego z ulubionych szlaków              |
+| `/api/login` `/api/register`      | Uwierzytelnianie: Logowanie i rejestracja użytkowników w celu ochrony endpointów zapisu.                                                      | Turysta niezalogowany | `LoginForm`, `RegisterForm`                                                   |
 
 # Architecture Decision Record
 
