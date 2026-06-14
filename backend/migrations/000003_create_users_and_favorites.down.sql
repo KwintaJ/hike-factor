@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS favorite_trails;
+DROP TABLE IF EXISTS users;

@@ -37,6 +37,9 @@ func main() {
     h := &handler.Handler{DB: dbPool}
     e.GET("/api/trails", h.GetAllTrails)
     e.GET("/api/trails/conditions", h.GetTrailConditionsProxy)
+    e.POST("/api/login", h.Login)
+    e.POST("/api/register", h.Register)
+    e.GET("/api/validate-token", h.ValidateToken)
 
     // logger
     e.Logger.Fatal(e.Start(":8080"))
