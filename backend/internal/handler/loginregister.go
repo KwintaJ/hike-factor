@@ -13,22 +13,29 @@ import (
 var jwtKey = []byte("asdc87va9")
 
 func (h *Handler) Register(c echo.Context) error {
-	creds := new(model.Credentials)
-	if err := c.Bind(creds); err != nil {
-		return err
-	}
+    creds := new(model.Credentials)
+    
+    if err := c.Bind(creds); err != nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Nieprawidłowy format danych żądania"})
+    }
 
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(creds.Password), bcrypt.DefaultCost)
+    if err := c.Validate(creds); err != nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{
+            "error": "Rejestracja odrzucona: Login musi mieć od 3 do 40 znaków. Hasło musi mieć minimum 8 znaków i zawierać wielką literę, małą literę, cyfrę oraz znak specjalny.",
+        })
+    }
 
-	_, err := h.DB.Exec(c.Request().Context(), 
-		"INSERT INTO users (username, password_hash) VALUES ($1, $2)", 
-		creds.Username, string(hashedPassword))
-	
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Użytkownik już istnieje"})
-	}
+    hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(creds.Password), bcrypt.DefaultCost)
 
-	return c.NoContent(http.StatusCreated)
+    _, err := h.DB.Exec(c.Request().Context(), 
+        "INSERT INTO users (username, password_hash) VALUES ($1, $2)", 
+        creds.Username, string(hashedPassword))
+    
+    if err != nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Użytkownik już istnieje"})
+    }
+
+    return c.NoContent(http.StatusCreated)
 }
 
 func (h *Handler) Login(c echo.Context) error {

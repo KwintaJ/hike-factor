@@ -4,7 +4,6 @@ import (
     "encoding/json"
     "log"
     "net/http"
-    "strconv"
     "time"
     "context"
 
@@ -12,15 +11,19 @@ import (
     "hike-factor/internal/model"
 )
 
+type TrailConditionsQuery struct {
+    ID int `query:"id" validate:"required,gt=0"`
+}
+
 func (h *Handler) GetTrailConditionsProxy(c echo.Context) error {
-    idStr := c.QueryParam("id")
-    if idStr == "" {
-        return echo.NewHTTPError(http.StatusBadRequest, "Brak parametru id")
+    req := new(TrailConditionsQuery)
+
+    if err := c.Bind(req); err != nil {
+        return echo.NewHTTPError(http.StatusBadRequest, "Nieprawidłowy format parametru ID (musi być liczbą)")
     }
 
-    trailID, err := strconv.Atoi(idStr)
-    if err != nil {
-        return echo.NewHTTPError(http.StatusBadRequest, "Nieprawidłowy format id (musi być liczbą)")
+    if err := c.Validate(req); err != nil {
+        return echo.NewHTTPError(http.StatusBadRequest, "Identyfikator szlaku jest wymagany i musi być większy od 0")
     }
 
     ctx := c.Request().Context()
@@ -30,14 +33,14 @@ func (h *Handler) GetTrailConditionsProxy(c echo.Context) error {
         weatherRaw, precipRaw, surfaceRaw, avalancheRaw, elevationRaw []byte
         updatedAt time.Time
     )
-    conditions.TrailID = trailID
+    conditions.TrailID = req.ID
 
     // sprawdzamy cache w bazie
     dbErr := h.DB.QueryRow(ctx, `
         SELECT trail_name, hike_factor, weather, precipitation_24h, surface, avalanche, elevation, distance, slope, updated_at
         FROM trail_conditions
         WHERE trail_id = $1
-    `, trailID).Scan(
+    `, req.ID).Scan(
         &conditions.TrailName,
         &conditions.HikeFactor,
         &weatherRaw,
@@ -105,7 +108,7 @@ func (h *Handler) GetTrailConditionsProxy(c echo.Context) error {
     `, fresh.TrailID, fresh.TrailName, fresh.HikeFactor, wJson, pJson, sJson, aJson, eJson, fresh.Distance, fresh.Slope, time.Now())
 
     if execErr != nil {
-        log.Printf("[Proxy] Błąd zapisu UPSERT dla szlaku %d: %v", trailID, execErr)
+        log.Printf("[Proxy] Błąd zapisu UPSERT dla szlaku %d: %v", req.ID, execErr)
     }
 
     c.Response().Header().Set("X-Cache", "MISS")

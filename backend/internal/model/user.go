@@ -16,6 +16,6 @@ type FavoriteTrail struct {
 }
 
 type Credentials struct {
-    Username string `json:"username"`
-    Password string `json:"password"`
+    Username string `json:"username" validate:"required,min=3,max=40"`
+    Password string `json:"password" validate:"required,password"`
 }

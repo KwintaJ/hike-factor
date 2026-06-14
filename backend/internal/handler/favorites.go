@@ -2,7 +2,6 @@ package handler
 
 import (
     "net/http"
-    "strconv"
 
     "github.com/golang-jwt/jwt/v5"
     "github.com/labstack/echo/v4"
@@ -62,21 +61,28 @@ func (h *Handler) GetFavorites(c echo.Context) error {
     return c.JSON(http.StatusOK, favorites)
 }
 
+type FavoriteQuery struct {
+    ID int `query:"id" validate:"required,gt=0"`
+}
+
 func (h *Handler) AddFavorite(c echo.Context) error {
     userID, err := getUserIDFromToken(c)
     if err != nil {
         return err
     }
 
-    trailIDStr := c.QueryParam("id")
-    trailID, err := strconv.Atoi(trailIDStr)
-    if err != nil || trailID <= 0 {
+    req := new(FavoriteQuery)
+    
+    if err := (&echo.DefaultBinder{}).BindQueryParams(c, req); err != nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Nieprawidłowy format ID szlaku (musi być liczbą)"})
+    }
+
+    if err := c.Validate(req); err != nil {
         return c.JSON(http.StatusBadRequest, map[string]string{"error": "Nieprawidłowe lub brakujące ID szlaku"})
     }
 
     query := `INSERT INTO favorite_trails (user_id, trail_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`
-    
-    _, err = h.DB.Exec(c.Request().Context(), query, userID, trailID)
+    _, err = h.DB.Exec(c.Request().Context(), query, userID, req.ID)
     if err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Nie udało się dodać szlaku do ulubionych"})
     }
@@ -90,15 +96,18 @@ func (h *Handler) RemoveFavorite(c echo.Context) error {
         return err
     }
 
-    trailIDStr := c.QueryParam("id")
-    trailID, err := strconv.Atoi(trailIDStr)
-    if err != nil || trailID <= 0 {
+    req := new(FavoriteQuery)
+    
+    if err := (&echo.DefaultBinder{}).BindQueryParams(c, req); err != nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Nieprawidłowy format ID szlaku (musi być liczbą)"})
+    }
+
+    if err := c.Validate(req); err != nil {
         return c.JSON(http.StatusBadRequest, map[string]string{"error": "Nieprawidłowe lub brakujące ID szlaku"})
     }
 
     query := `DELETE FROM favorite_trails WHERE user_id = $1 AND trail_id = $2`
-    
-    result, err := h.DB.Exec(c.Request().Context(), query, userID, trailID)
+    result, err := h.DB.Exec(c.Request().Context(), query, userID, req.ID)
     if err != nil {
         return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Nie udało się usunąć szlaku z ulubionych"})
     }

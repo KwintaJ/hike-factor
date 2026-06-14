@@ -7,7 +7,9 @@ import (
 
     "github.com/labstack/echo/v4"
     "github.com/labstack/echo/v4/middleware"
-    
+
+    "github.com/go-playground/validator/v10"
+
     "github.com/labstack/echo-jwt/v4"
 )
 
@@ -34,6 +36,10 @@ func main() {
         AllowOrigins: []string{"http://localhost:5173"},
         AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
     }))
+
+    v := validator.New()
+    v.RegisterValidation("password", repository.PasswordValidator)
+    e.Validator = &repository.CustomValidator{Validator: v}
 
     // routing
     h := &handler.Handler{DB: dbPool}
