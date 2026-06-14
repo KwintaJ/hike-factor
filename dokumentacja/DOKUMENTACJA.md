@@ -1,24 +1,3 @@
-# Dokumentacja
-
-## Decyzja operacyjna
-
-System hike-factor ma pomóc turystom i pasjonatom wędrówek górskich w sytuacji planowania wyjścia na tatrzańskie szlaki w warunkach zmiennej pogody i zagrożeń obiektywnych podjąć decyzję o wyborze bezpiecznej, optymalnej trasy lub ewentualnej rezygnacji z wycieczki, na podstawie bieżącej prognozy pogody, analizy warunków z poprzedniej doby (ocena śliskości/śniegu), komunikatów lawinowych TOPR oraz parametrów topograficznych szlaku (nachylenie, profil), w czasie wygodnym dla planowania przed wyruszeniem na szlak (odpowiedź systemu w ciągu kilku sekund).
-
-## Aktorzy i tryby pracy
-
-| Rola                  | Typowa decyzja                                                                                                                    | Widok główny              | Pytanie kontrolne UI                                                                                                                              |
-| :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Turysta Niezalogowany | Który szlak wybrać na bezpieczny spacer na podstawie ogólnych warunków meteorologicznych.                                         | `/ ` (Mapa główna)        | Czy ogólna ocena „hike-factor” oraz ostrzeżenia pogodowe są widoczne w panelu dolnym w 2 sekundy po kliknięciu szlaku bez przewijania strony?     |
-| Turysta Zalogowany    | Który ze swoich ulubionych szlaków ma dziś najlepsze warunki; czy warunki na obserwowanych trasach uległy nagłemu pogorszeniu.    | `/ ` oraz `/favorites`    | Czy system pozwala na szybkie przejście z listy ulubionych do lokalizacji szlaku na mapie i zapisanie nowej trasy jednym kliknięciem?             |
-
-## Mapa widoków
-
-| Route                             | Cel widoku                                                                                                                                    | Aktor                 | Kluczowe komponenty                                                           |
-| :-------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------- | :---------------------------------------------------------------------------- |
-| `/ `                              | Główny pulpit decyzyjny: Interaktywna mapa Tatr z nakładkami warstw oraz dolny panel szczegółów szlaku (profil, nachylenie, hike-factor).     | Każdy                 | `MapView`, `DetailsPanel`,                                                    | 
-| `/favorites`                      | Zarządzanie trasami: Lista obserwowanych przez użytkownika szlaków z agregacją ich aktualnego statusu i alertów.                              | Turysta zalogowany    | `FavoritesView`, `DetailsPanel` dla każdego z ulubionych szlaków              |
-| `/api/login` `/api/register`      | Uwierzytelnianie: Logowanie i rejestracja użytkowników w celu ochrony endpointów zapisu.                                                      | Turysta niezalogowany | `LoginForm`, `RegisterForm`                                                   |
-
 # Architecture Decision Record
 
 ## PostgreSQL
@@ -69,13 +48,37 @@ System hike-factor ma pomóc turystom i pasjonatom wędrówek górskich w sytuac
 | **Uzasadnienie** | Narzędzie pozwala na zapisywanie migracji w postaci czytelnych par plików tekstowych `.up.sql` oraz `.down.sql`. Zapewnia to pełną synergię z decyzją o pisaniu czystych zapytań dla PostGIS. Może być uruchamiane zarówno z poziomu kodu Go, jak i jako niezależny krok w potoku CI/CD za pomocą oficjalnego obrazu bazy danych. Ręczne pisanie tabel jest też niezależne od struktur danych w pakiecie `model`.    |
 | **Trade-offs** | Pisanie migracji w czystym SQL nakłada obowiązek ręcznego projektowania skryptów cofających (`.down.sql`) – system nie wygeneruje ich automatycznie. Ponadto, jeśli w pliku migracji pojawi się błąd składniowy, baza danych zostanie zablokowana w tzw. stanie `dirty`, co wymaga ręcznej interwencji w tabeli migracyjnej przed ponownym uruchomieniem serwera.                                                      |
 
-## go-playground/validator
+## go-playground/validator/v10
 
-| **go-playground/validator/v10** | Narzędzie do deklaratywnej walidacji struktur danych (DTO) w warstwie HTTP aplikacji. Każdy punkt wejściowy do systemu wymaga rygorystycznego sprawdzenia poprawności. Serwer musi blokować niepoprawne dane (np. zbyt krótkie loginy, ujemne ID szlaków czy słabe hasła) na poziomie kontrolera, zanim obciążą one procesor, bazę danych PostgreSQL lub zewnętrzne API.                                |
+| **go-playground validator** | Narzędzie do deklaratywnej walidacji struktur danych (DTO) w warstwie HTTP aplikacji. Każdy punkt wejściowy do systemu wymaga rygorystycznego sprawdzenia poprawności. Serwer musi blokować niepoprawne dane (np. zbyt krótkie loginy, ujemne ID szlaków czy słabe hasła) na poziomie kontrolera, zanim obciążą one procesor, bazę danych PostgreSQL lub zewnętrzne API.                                    |
 | :------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Alternatywy** | ozzo-validation, asaskevich/govalidator, ręczne pisanie bloków warunkowych `if-else` dla każdego pola. Popularne rozwiązania takie jak Zod, Pydantic czy Joi zostały odrzucone ze względu na brak kompatybilności z ekosystemem języka Go.                                                                                                                                                                              |
 | **Uzasadnienie** | Biblioteka posiada bezszwowe, natywne wsparcie w frameworku Echo, co pozwala na automatyzację procesu sprawdzania poprawności zaraz po zbindowaniu danych. Umożliwia definiowanie reguł w sposób czytelny przy użyciu tagów strukturalnych (np. `validate:"required,gt=0"`). Daje także pełną elastyczność w rejestrowaniu niestandardowych reguł, co pozwala na np. zaawansowaną implementację weryfikacji haseł.     |
 | **Trade-offs** | Walidacja opiera się na mechanizmie refleksji (runtime reflection), co niesie za sobą minimalny narzut wydajnościowy. Dodatkowo, wszelkie błędy składniowe lub literówki w tagach walidacji (np. napisanie `valdate` zamiast `validate`) nie zostaną wykryte przez kompilator Go podczas budowania projektu, lecz ujawnią się dopiero w trakcie działania aplikacji (w runtime).                                         |
+
+
+# Dokumentacja
+
+## Decyzja operacyjna
+
+System hike-factor ma pomóc turystom i pasjonatom wędrówek górskich w sytuacji planowania wyjścia na tatrzańskie szlaki w warunkach zmiennej pogody i zagrożeń obiektywnych podjąć decyzję o wyborze bezpiecznej, optymalnej trasy lub ewentualnej rezygnacji z wycieczki, na podstawie bieżącej prognozy pogody, analizy warunków z poprzedniej doby (ocena śliskości/śniegu), komunikatów lawinowych TOPR oraz parametrów topograficznych szlaku (nachylenie, profil), w czasie wygodnym dla planowania przed wyruszeniem na szlak (odpowiedź systemu w ciągu kilku sekund).
+
+## Aktorzy i tryby pracy
+
+| Rola                  | Typowa decyzja                                                                                                                    | Widok główny              | Pytanie kontrolne UI                                                                                                                              |
+| :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------- | :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Turysta Niezalogowany | Który szlak wybrać na bezpieczny spacer na podstawie ogólnych warunków meteorologicznych.                                         | `/ ` (Mapa główna)        | Czy ogólna ocena „hike-factor” oraz ostrzeżenia pogodowe są widoczne w panelu dolnym w 2 sekundy po kliknięciu szlaku bez przewijania strony?     |
+| Turysta Zalogowany    | Który ze swoich ulubionych szlaków ma dziś najlepsze warunki; czy warunki na obserwowanych trasach uległy nagłemu pogorszeniu.    | `/ ` oraz `/favorites`    | Czy system pozwala na szybkie przejście z listy ulubionych do lokalizacji szlaku na mapie i zapisanie nowej trasy jednym kliknięciem?             |
+
+## Mapa widoków
+
+| Route                             | Cel widoku                                                                                                                                    | Aktor                 | Kluczowe komponenty                                                           |
+| :-------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------- | :---------------------------------------------------------------------------- |
+| `/ `                              | Główny pulpit decyzyjny: Interaktywna mapa Tatr z nakładkami warstw oraz dolny panel szczegółów szlaku (profil, nachylenie, hike-factor).     | Każdy                 | `MapView`, `DetailsPanel`,                                                    | 
+| `/favorites`                      | Zarządzanie trasami: Lista obserwowanych przez użytkownika szlaków z agregacją ich aktualnego statusu i alertów.                              | Turysta zalogowany    | `FavoritesView`, `DetailsPanel` dla każdego z ulubionych szlaków              |
+| `/api/login` `/api/register`      | Uwierzytelnianie: Logowanie i rejestracja użytkowników w celu ochrony endpointów zapisu.                                                      | Turysta niezalogowany | `LoginForm`, `RegisterForm`                                                   |
+
+
 # Kontrakt API
 
 Wszystkie odpowiedzi w przypadku błędu zwracają schematyczny JSON:  
