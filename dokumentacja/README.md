@@ -51,6 +51,14 @@ Aplikacja wymaga stworzenia interaktywnego panelu mapy połączonego z dynamiczn
 Typowym błędem w aplikacjach z mapami jest trzymanie współrzędnych geograficznych oraz danych z API w jednym globalnym stanie. Powoduje to, że ruch mapy lub kliknięcie elementu wymusza ponowne renderowanie punktów geometrycznych, drastycznie obniżając płynność.  
 *Uzasadnienie:* Zgodnie z mapą stanu, dane o warunkach szlaków to Server-state. TanStack Query automatycznie zajmie się ich cache'owaniem, obsługą stanu isLoading i ponownym odpytywaniem backendu tylko wtedy, gdy minie czas TTL. Stan Client-state (aktualnie kliknięty szlak activeTrailId) trafi do mikro-store'a Zustand. Zapobiega to niepotrzebnym renderom i rozdziela odpowiedzialności zgodnie z zasadami czystej architektury.  
 
+## MapTiler
+
+**MapTiler API:** dostawca podkładów kartograficznych oraz kafelków mapowych (Vector i Raster Tiles) dla interaktywnej mapy Tatr.  
+Kluczowym elementem interfejsu systemu jest płynna, responsywna mapa, na której renderowane są szlaki turystyczne i nakładki z danymi o zagrożeniach. Aby aplikacja miała sens, potrzebuje podkładu mapowego o charakterystyce outdoorowej – zawierającego dokładną topografię górską, cieniowanie rzeźby terenu (hillshading) oraz poziomice (contour lines). Dane te muszą być serwowane w nowoczesnym formacie wektorowym, aby umożliwić płynne obracanie, skalowanie i dynamiczną zmianę warstw bezpośrednio w przeglądarce użytkownika.  
+*Alternatywy:* Mapbox API, Google Maps Platform, serwowanie własnych kafelków z darmowego OpenStreetMap (OSM) za pomocą biblioteki Leaflet.  
+*Uzasadnienie:* Mapbox oferuje potężne narzędzia, jednak jego agresywna polityka cenowa po zamknięciu kodu źródłowego stanowi zbyt duże ryzyko finansowe dla projektu. Google Maps jest skrajnie drogie, a jego domyślne style są zoptymalizowane pod nawigację samochodową i miejską, całkowicie pomijając szczegóły topograficzne niezbędne w Tatrach. MapTiler dostarcza dedykowany, dopracowany styl "Outdoor", cechuje się pełną synergią z otwartoźródłową biblioteką `MapLibre GL JS` i oferuje bardzo hojny darmowy pakiet zapytań (free-tier), w zupełności wystarczający dla naszej bazy użytkowników. Standard wektorowy MapTilera pozwala też na bezszwowe nakładanie geometrii `LINESTRING` z naszej bazy PostGIS w ułamku sekundy.  
+*Trade-offs:* Wybór MapTilera uzależnia system od zewnętrznego dostawcy SaaS (SaaS lock-in) w kwestii renderowania kafelków bazowych. Ponadto, tworzenie wysoce spersonalizowanych warstw wizualnych wymaga korzystania z ich zewnętrznego edytora chmurowego lub ręcznego zarządzania plikami konfiguracyjnymi zgodnie ze specyfikacją Mapbox Style.
+
 ## Golang-migrate
 
 **Golang-migrate:** narzędzie do wersjonowania i automatyzacji zmian w schemacie bazy danych.  
