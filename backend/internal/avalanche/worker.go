@@ -5,9 +5,11 @@ import (
     "log"
     "net/http"
     "regexp"
-    "strconv"
     "sync"
     "time"
+    "errors"
+    "encoding/json"
+    "fmt"
 )
 
 var (
@@ -54,25 +56,40 @@ func fetchLevel() {
         return
     }
 
-    html := string(body)
-
-    // regex szukający <span class="law-mst-lev">X</span>
-    re := regexp.MustCompile(`<span class="law-mst-lev">\s*([0-5])\s*</span>`)
-    matches := re.FindStringSubmatch(html)
-
-    if len(matches) > 1 {
-        level, err := strconv.Atoi(matches[1])
-        if err != nil {
-            log.Printf("[Avalanche Worker] Błąd konwersji wyciągniętego stopnia na int: %v", err)
-            return
-        }
-
+    level, err := parseRawReport(body)
+    if err != nil {
+        log.Printf("[Avalanche Worker] Błąd wyciągania stopnia lawinowego: %v", err)
+        
         mu.Lock()
-        avalancheLevel = level
+        avalancheLevel = -1
         mu.Unlock()
-
-        log.Printf("[Avalanche Worker] Aktualny stopień lawinowy ustawiony na: %d", level)
-    } else {
-        log.Println("[Avalanche Worker] Nie znaleziono znacznika stopnia lawinowego w strukturze HTML!")
+        return
     }
+
+    mu.Lock()
+    avalancheLevel = level
+    mu.Unlock()
+
+    log.Printf("[Avalanche Worker] Sukces! Aktualny stopień lawinowy ustawiony na: %d", level)
+}
+
+func parseRawReport(body []byte) (int, error) {
+    re := regexp.MustCompile(`const oLawReport\s*=\s*(\{.*?\});`)
+    matches := re.FindStringSubmatch(string(body))
+
+    if len(matches) < 2 {
+        return -1, errors.New("nie znaleziono obiektu oLawReport w strukturze strony")
+    }
+
+    var toprData struct {
+        Mst struct {
+            Lev int `json:"lev"`
+        } `json:"mst"`
+    }
+
+    if err := json.Unmarshal([]byte(matches[1]), &toprData); err != nil {
+        return -1, fmt.Errorf("błąd unmarshalu danych JSON: %w", err)
+    }
+
+    return toprData.Mst.Lev, nil
 }

@@ -16,7 +16,13 @@ func main() {
     dbPool := repository.InitDB()
     defer dbPool.Close()
 
-    // get data
+    // migrations
+    repository.MigrateDB()
+
+    // seed data
+    repository.SeedData(dbPool)
+
+    // start avalanche worker
     avalanche.StartAvalancheWorker()
 
     // CORS

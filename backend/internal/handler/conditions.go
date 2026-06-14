@@ -6,6 +6,7 @@ import (
     "math"
     "net/http"
     "context"
+    "strconv"
 
     "hike-factor/internal/model"
     "hike-factor/internal/avalanche"
@@ -46,11 +47,14 @@ func (h *Handler) getTrailData(id string) (model.Trail, string, string, error) {
         return model.Trail{}, "", "", err
     }
 
+    idInt, _ := strconv.Atoi(id)
+
     return model.Trail {
-        Name: trailName,
-        MinElevation: minElev,
-        MaxElevation: maxElev,
-        Distance: dist,
+        ID:             idInt,
+        Name:           trailName,
+        MinElevation:   minElev,
+        MaxElevation:   maxElev,
+        Distance:       dist,
     }, fmt.Sprintf("%.6f", lat), fmt.Sprintf("%.6f", lon), nil
 }
 
@@ -258,6 +262,7 @@ func evaluateConditions(trail model.Trail, meteo OpenMeteoResponse, avLevel int)
 
     // return conditions
     return model.TrailConditions{
+        TrailID:            trail.ID,
         TrailName:          trail.Name,
         HikeFactor:         hikeFactorScore,
         Weather: model.WeatherInfo{

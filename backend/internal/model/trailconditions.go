@@ -1,6 +1,7 @@
 package model
 
 type TrailConditions struct {
+    TrailID             int             `json:"trail_id"`
     TrailName           string          `json:"trail_name"`
     HikeFactor          int             `json:"hikeFactor"`
     Weather             WeatherInfo     `json:"weather"`
