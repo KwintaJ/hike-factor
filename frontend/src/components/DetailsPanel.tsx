@@ -56,8 +56,8 @@ export const DetailsPanel: React.FC = () => {
     <div className="uppercase tracking-wide grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-4 w-full">
       
       {/* KAFELEK 0: NAZWA SZLAKU */}
-      <div className="col-span-full bg-retro-dark text-retro-beige py-2 px-4 rounded-xl border-2 border-retro-dark flex items-center justify-center shadow-sm">
-        <h2 className="text-lg sm:text-xl font-black text-center tracking-widest">
+      <div className="col-span-full bg-retro-dark py-2 px-4 rounded-xl border-2 border-retro-dark flex items-center justify-center shadow-sm">
+        <h2 className="text-lg sm:text-xl font-black text-retro-beige text-center tracking-widest">
           {data.trail_name}
         </h2>
       </div>
