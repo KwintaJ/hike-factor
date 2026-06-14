@@ -59,5 +59,12 @@ func SeedData(pool *pgxpool.Pool) {
     if count <= 0 { 
         SeedTrailData(pool)
     }
+
+    // sprawdzenie czy demo users sa w bazie - jesli nie seeding
+    var userCount int
+    _ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE username IN ('Test1', 'Test2')").Scan(&userCount)
+    if userCount != 2 {
+        SeedDemoUsers(pool)
+    }
 }
 
