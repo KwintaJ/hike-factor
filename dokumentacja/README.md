@@ -59,6 +59,14 @@ Z racji świadomej rezygnacji z ciężkich systemów ORM na rzecz natywnego SQL 
 *Uzasadnienie:* `golang-migrate` pozwala na zapisywanie migracji w postaci czytelnych par plików tekstowych `.up.sql` (tworzenie/modyfikacja) oraz `.down.sql` (wycofywanie zmian). Zapewnia to pełną synergię z decyzją o pisaniu czystych zapytań dla PostGIS. Może być uruchamiane zarówno z poziomu kodu Go (przy inicjalizacji serwera), jak i jako niezależny krok w potoku CI/CD za pomocą oficjalnego obrazu bazy danych lub CLI. Ręczne pisanie tabel jest też niezależne od zdefiniowanych struktur danych Go w package `model`.  
 *Trade-offs:* Pisanie migracji w czystym SQL nakłada obowiązek ręcznego projektowania skryptów cofających (`.down.sql`) – system nie wygeneruje ich automatycznie. Ponadto, jeśli w pliku migracji pojawi się błąd składniowy, baza danych zostanie zablokowana w tzw. stanie `dirty`, co wymaga ręcznej interwencji w tabeli migracyjnej bazy przed ponownym uruchomieniem serwera.  
 
+## go-playground/validator
+
+**go-playground/validator/v10:** narzędzie do deklaratywnej walidacji struktur danych (DTO) w warstwie HTTP aplikacji.  
+Każdy punkt wejściowy do systemu (zarówno rejestracja użytkownika, jak i przesyłanie identyfikatorów szlaków w parametrach zapytania URL) wymaga rygorystycznego sprawdzenia poprawności. Serwer musi blokować niepoprawne lub niebezpieczne dane (np. zbyt krótkie loginy, ujemne ID szlaków czy hasła niespełniające wymogów bezpieczeństwa) na poziomie kontrolera, zanim obciążą one procesor (np. operacjami haszowania bcrypt) lub bazę danych PostgreSQL.  
+*Alternatywy:* ozzo-validation, asaskevich/govalidator, ręczne pisanie bloków warunkowych `if-else` dla każdego pola. Popularne rozwiązania takie jak Zod, Pydantic czy Joi zostały odrzucone ze względu na brak kompatybilności z ekosystemem języka Go.  
+*Uzasadnienie:* Biblioteka posiada bezszwowe, natywne wsparcie w frameworku Echo, co pozwala na automatyzację procesu sprawdzania poprawności zaraz po zbindowaniu danych (`c.Bind` lub `BindQueryParams`). Umożliwia definiowanie reguł w sposób czytelny i czysty przy użyciu tagów strukturalnych (np. `validate:"required,gt=0"`). Daje także pełną elastyczność w rejestrowaniu niestandardowych reguł, co pozwala na n.p. implementację weryfikacji haseł.  
+*Trade-offs:* Walidacja opiera się na mechanizmie refleksji (runtime reflection), co niesie za sobą minimalny, choć w skali naszej aplikacji pomijalny narzut wydajnościowy. Dodatkowo, wszelkie błędy składniowe lub literówki w tagach walidacji (np. napisanie `valdate` zamiast `validate`) nie zostaną wykryte przez kompilator Go podczas budowania projektu, lecz ujawnią się dopiero w trakcie działania aplikacji (w runtime).
+
 # Kontrakt API
 
 Wszystkie odpowiedzi w przypadku błędu zwracają schematyczny JSON:  
