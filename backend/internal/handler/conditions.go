@@ -292,16 +292,16 @@ func evaluateConditions(trail model.Trail, meteo OpenMeteoResponse, avLevel int)
     }
 }
 
-func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
+func (h *Handler) GetTrailConditionsHandler(c echo.Context) (*model.TrailConditions, error) {
     id := c.QueryParam("id")
     if id == "" {
-        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing id parameter"})
+        return nil, echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "Missing id parameter"})
     }
 
     trail, lat, lon, err := h.getTrailData(id)
     if err != nil {
         fmt.Printf("DEBUG: Błąd pobierania danych dla ID %s: %v\n", id, err)
-        return c.JSON(http.StatusNotFound, map[string]string{"error": "Trail not found or DB error"})
+        return nil, echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "Trail not found or DB error"})
     }
 
     apiURL := fmt.Sprintf(
@@ -311,17 +311,18 @@ func (h *Handler) GetTrailConditionsHandler(c echo.Context) error {
 
     resp, err := http.Get(apiURL)
     if err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch weather"})
+        return nil, echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch weather"})
     }
     defer resp.Body.Close()
 
     var meteoData OpenMeteoResponse
     if err := json.NewDecoder(resp.Body).Decode(&meteoData); err != nil {
-        return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Parse error"})
+        return nil, echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "Parse error"})
     }
 
     avLevel := avalanche.GetAvalancheLevel()
 
     report := evaluateConditions(trail, meteoData, avLevel)
-    return c.JSON(http.StatusOK, report)
+    
+    return &report, nil
 }

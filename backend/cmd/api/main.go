@@ -36,7 +36,7 @@ func main() {
     // routing
     h := &handler.Handler{DB: dbPool}
     e.GET("/api/trails", h.GetAllTrails)
-    e.GET("/api/trails/conditions", h.GetTrailConditionsHandler)
+    e.GET("/api/trails/conditions", h.GetTrailConditionsProxy)
 
     // logger
     e.Logger.Fatal(e.Start(":8080"))

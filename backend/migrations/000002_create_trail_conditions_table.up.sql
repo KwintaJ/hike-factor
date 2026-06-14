@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS trail_conditions (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS trail_conditions_trail_id_idx ON trail_conditions(trail_id);
+CREATE UNIQUE INDEX IF NOT EXISTS trail_conditions_trail_id_idx ON trail_conditions(trail_id);
