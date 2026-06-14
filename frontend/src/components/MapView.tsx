@@ -9,6 +9,7 @@ export const MapView: React.FC = () => {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const setSelectedTrailId = useMapStore((state) => state.setSelectedTrailId);
   const selectedTrailId = useMapStore((state) => state.selectedTrailId);
+  const isAuthView = useMapStore((state) => state.isAuthView);
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
@@ -92,11 +93,11 @@ export const MapView: React.FC = () => {
     }
   }, [selectedTrailId]);
 
-  const isTrailSelected = selectedTrailId !== null;
+  const isMapCollapsed = selectedTrailId !== null || isAuthView;
 
   return (
     <div className={`relative w-full transition-all duration-500 ease-in-out ${
-      isTrailSelected ? 'h-[42vh]' : 'h-[84vh]'
+      isMapCollapsed ? 'h-[42vh]' : 'h-[84vh]'
     } rounded-2xl border-2 border-retro-green overflow-hidden shadow-lg`}>
       <div ref={mapContainer} className="w-full h-full" />
     </div>

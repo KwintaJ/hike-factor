@@ -27,8 +27,8 @@ export const DetailsPanel: React.FC = () => {
   // 1. Ekran startowy (brak wybranego ID)
   if (selectedTrailId === null) {
     return (
-      <div className="w-full min-h-[70px] border-2 border-dashed border-retro-green/30 rounded-xl flex items-center justify-center text-retro-blue font-bold text-sm p-4 text-center">
-        📍 Wybierz szlak, aby załadować warunki
+      <div className="w-full min-h-[70px] border-2 border-dashed border-retro-green/30 rounded-xl flex items-center justify-center uppercase tracking-wide text-retro-blue font-bold text-sm p-4 text-center">
+        Wybierz szlak na mapie
       </div>
     );
   }
@@ -36,8 +36,8 @@ export const DetailsPanel: React.FC = () => {
   // 2. Ekran ładowania
   if (isLoading) {
     return (
-      <div className="w-full min-h-[70px] border-2 border-retro-green/20 rounded-xl flex items-center justify-center text-retro-green font-bold text-sm animate-pulse p-4 text-center">
-        ⏳ Serwer oblicza dane dla szlaku...
+      <div className="w-full min-h-[70px] border-2 border-retro-green/20 rounded-xl flex items-center justify-center uppercase tracking-wide text-retro-green font-bold text-sm animate-pulse p-4 text-center">
+        Serwer ładuje dane...
       </div>
     );
   }
@@ -45,8 +45,8 @@ export const DetailsPanel: React.FC = () => {
   // 3. Ekran błędu
   if (error || !data) {
     return (
-      <div className="w-full min-h-[70px] bg-retro-rust/10 border-2 border-retro-rust/40 rounded-xl flex items-center justify-center text-retro-rust font-bold text-sm p-4 text-center">
-        ⚠️ Błąd połączenia z serwerem
+      <div className="w-full min-h-[70px] bg-retro-rust/10 border-2 border-retro-rust/40 rounded-xl flex items-center uppercase tracking-wide justify-center text-retro-rust font-bold text-sm p-4 text-center">
+        Błąd połączenia z serwerem
       </div>
     );
   }

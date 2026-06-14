@@ -1,0 +1,45 @@
+.topnav-container {
+  position: absolute;
+  top: 20px; /* Odstęp od góry ekranu */
+  left: 50%;
+  transform: translateX(-50%); /* Wyśrodkowanie */
+  z-index: 1000; /* Musi być wyżej niż komponenty mapy (np. Leaflet/Mapbox) */
+  width: 90%;
+  max-width: 800px;
+}
+
+/* Grid podobny do DetailPanels */
+.topnav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+}
+
+.topnav-btn {
+  background: #f0f0f0;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.topnav-btn:hover {
+  background: #e0e0e0;
+  transform: translateY(-2px);
+}
+
+.logout-btn {
+  background: #ffebe9;
+  color: #d73a49;
+}
+
+.logout-btn:hover {
+  background: #ffdce0;
+}
