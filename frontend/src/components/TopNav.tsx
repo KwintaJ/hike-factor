@@ -20,7 +20,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onViewChange, currentView, isLog
           }}
           className="px-4 py-2 bg-retro-dark uppercase tracking-wide text-sm text-retro-beige rounded-lg font-semibold hover:bg-retro-green transition-colors"
         >
-          HikeFactor
+          hike-factor
         </button>
 
         <div className="flex gap-2">
