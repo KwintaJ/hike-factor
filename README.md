@@ -9,7 +9,7 @@ Aplikacja umożliwia użytkownikom utworzenie konta i stworzenie biblioteki swoi
 
 Aby zainstalować aplikację należy sklonować to repozytorium, lub pobrać całość jako ZIP.  
 Następnie w terminalu, w głównym folderze projektu wykonać komendę `docker compose up --build -d`  
-Aplikację otworzyć przez przeglądarkę pod adresem [localhost:5173])(http://localhost:5173/)  
+Aplikację otworzyć przez przeglądarkę pod adresem http://localhost:5173/  
 
 ## Dokumentacja
 
