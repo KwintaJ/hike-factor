@@ -51,6 +51,14 @@ Aplikacja wymaga stworzenia interaktywnego panelu mapy połączonego z dynamiczn
 Typowym błędem w aplikacjach z mapami jest trzymanie współrzędnych geograficznych oraz danych z API w jednym globalnym stanie. Powoduje to, że ruch mapy lub kliknięcie elementu wymusza ponowne renderowanie punktów geometrycznych, drastycznie obniżając płynność.  
 *Uzasadnienie:* Zgodnie z mapą stanu, dane o warunkach szlaków to Server-state. TanStack Query automatycznie zajmie się ich cache'owaniem, obsługą stanu isLoading i ponownym odpytywaniem backendu tylko wtedy, gdy minie czas TTL. Stan Client-state (aktualnie kliknięty szlak activeTrailId) trafi do mikro-store'a Zustand. Zapobiega to niepotrzebnym renderom i rozdziela odpowiedzialności zgodnie z zasadami czystej architektury.  
 
+## Golang-migrate
+
+**Golang-migrate:** narzędzie do wersjonowania i automatyzacji zmian w schemacie bazy danych.  
+Z racji świadomej rezygnacji z ciężkich systemów ORM na rzecz natywnego SQL i rozszerzenia PostGIS, struktura tabel (szlaki, użytkownicy, ulubione), relacje przestrzenne oraz indeksy GIST muszą być zarządzane w sposób w pełni kontrolowany, powtarzalny i niezależny od kodu aplikacyjnego.  
+*Alternatywy:* Prisma, dbmate, automatyczne migracje wbudowane w GORM lub ręczne uruchamianie skryptów SQL przy wdrażaniu aplikacji.  
+*Uzasadnienie:* `golang-migrate` pozwala na zapisywanie migracji w postaci czytelnych par plików tekstowych `.up.sql` (tworzenie/modyfikacja) oraz `.down.sql` (wycofywanie zmian). Zapewnia to pełną synergię z decyzją o pisaniu czystych zapytań dla PostGIS. Może być uruchamiane zarówno z poziomu kodu Go (przy inicjalizacji serwera), jak i jako niezależny krok w potoku CI/CD za pomocą oficjalnego obrazu bazy danych lub CLI. Ręczne pisanie tabel jest też niezależne od zdefiniowanych struktur danych Go w package `model`.  
+*Trade-offs:* Pisanie migracji w czystym SQL nakłada obowiązek ręcznego projektowania skryptów cofających (`.down.sql`) – system nie wygeneruje ich automatycznie. Ponadto, jeśli w pliku migracji pojawi się błąd składniowy, baza danych zostanie zablokowana w tzw. stanie `dirty`, co wymaga ręcznej interwencji w tabeli migracyjnej bazy przed ponownym uruchomieniem serwera.  
+
 # Kontrakt API
 
 Wszystkie odpowiedzi w przypadku błędu zwracają schematyczny JSON:  
