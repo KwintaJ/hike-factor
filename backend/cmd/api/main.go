@@ -7,6 +7,8 @@ import (
 
     "github.com/labstack/echo/v4"
     "github.com/labstack/echo/v4/middleware"
+    
+    "github.com/labstack/echo-jwt/v4"
 )
 
 func main() {
@@ -35,11 +37,22 @@ func main() {
 
     // routing
     h := &handler.Handler{DB: dbPool}
+
     e.GET("/api/trails", h.GetAllTrails)
     e.GET("/api/trails/conditions", h.GetTrailConditionsProxy)
+
     e.POST("/api/login", h.Login)
     e.POST("/api/register", h.Register)
     e.GET("/api/validate-token", h.ValidateToken)
+
+    r := e.Group("/api")
+    r.Use(echojwt.WithConfig(echojwt.Config{
+        SigningKey: []byte("asdc87va9"),
+    }))
+
+    r.POST("/favorites", h.AddFavorite)
+    r.DELETE("/favorites", h.RemoveFavorite)
+    r.GET("/favorites", h.GetFavorites)
 
     // logger
     e.Logger.Fatal(e.Start(":8080"))
