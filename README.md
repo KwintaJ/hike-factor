@@ -13,5 +13,6 @@ Aplikację otworzyć przez przeglądarkę pod adresem http://localhost:5173/
 
 ## Dokumentacja
 
-Dokumentacja aplikacji, View Map, Actors i Architecture Decision Record znajduje się [tutaj](https://github.com/KwintaJ/hike-factor/blob/main/dokumentacja/README.md).  
-Rozpisane zaliczenie wymagań projektu jest dostępne [tutaj](https://github.com/KwintaJ/hike-factor/blob/main/dokumentacja/ZALICZENIE.md).  
+Dokumentacja aplikacji, View Map, Actors i Architecture Decision Record znajduje się w pliku [DOKUMENTACJA.md](https://github.com/KwintaJ/hike-factor/blob/main/dokumentacja/DOKUMENTACJA.md)  
+Rozpisane zaliczenie wymagań projektu jest dostępne w pliku [ZALICZENIE.md](https://github.com/KwintaJ/hike-factor/blob/main/dokumentacja/ZALICZENIE.md)  
+Przykładowe zrzuty ekranu z podstawowych widoków aplikacji w pliku [DEMO.md](https://github.com/KwintaJ/hike-factor/blob/main/dokumentacja/DEMO.md)  
